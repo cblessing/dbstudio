@@ -1,0 +1,73 @@
+{
+  "name": "database-studio-vscode",
+  "displayName": "Database Studio (WebAssembly)",
+  "description": "High-performance WebAssembly database client for VS Code with universal database support (Oracle, SQL Server, Postgres, MySQL, DuckDB, SQLite), visual query runner, and editable data grid.",
+  "version": "1.0.0",
+  "publisher": "database-studio",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Data Science",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "database",
+    "sql",
+    "oracle",
+    "sql server",
+    "postgres",
+    "mysql",
+    "sqlite",
+    "duckdb",
+    "webassembly"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onCommand:database-studio.open",
+    "onView:database-studio.sidebarView"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "database-studio-container",
+          "title": "Database Studio",
+          "icon": "public/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "database-studio-container": [
+        {
+          "type": "webview",
+          "id": "database-studio.sidebarView",
+          "name": "Database Navigator"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "database-studio.open",
+        "title": "Open Database Studio (Full View)",
+        "category": "Database Studio",
+        "icon": "$(database)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "database-studio.open"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "database-studio.open",
+          "when": "view == database-studio.sidebarView",
+          "group": "navigation"
+        }
+      ]
+    }
+  }
+}
