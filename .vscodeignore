@@ -1,0 +1,13 @@
+.playwright-cli/**
+.vscode/**
+.aistudio/**
+scripts/**
+src/**
+src-extension/**
+tsconfig*.json
+vite.config.ts
+*.png
+!public/icon.png
+*.log
+.env*
+bun.lock

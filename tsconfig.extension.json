@@ -7,7 +7,8 @@
     "sourceMap": true,
     "rootDir": "src-extension",
     "strict": false,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node", "vscode"]
   },
   "include": ["src-extension"]
 }

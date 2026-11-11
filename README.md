@@ -2,8 +2,6 @@
 
 > High-performance WebAssembly database client for Visual Studio Code with universal SQL engine support, visual table designer, and interactive query runner.
 
-![Database Studio](public/icon.svg)
-
 ## Features
 
 - **⚡ Zero-Latency WebAssembly Engine**: Runs embedded 32-bit `sql.js` (SQLite WASM) locally with zero external network dependencies.
