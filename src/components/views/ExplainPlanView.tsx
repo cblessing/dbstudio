@@ -1,18 +1,17 @@
 import React from 'react';
 import { ExecutionPlanStep } from '../../types/database';
-import { GitCommit, Layers, Database, ArrowRight, CheckCircle } from 'lucide-react';
+import { GitCommit, Layers, CheckCircle } from 'lucide-react';
 
 interface ExplainPlanViewProps {
   steps: ExecutionPlanStep[];
-  query: string;
 }
 
-export const ExplainPlanView: React.FC<ExplainPlanViewProps> = ({ steps, query }) => {
+export const ExplainPlanView: React.FC<ExplainPlanViewProps> = ({ steps }) => {
   if (!steps || steps.length === 0) {
     return (
       <div className="p-6 text-center text-[#858585] font-sans text-xs">
         <GitCommit className="w-8 h-8 text-purple-400 mx-auto mb-2 opacity-50" />
-        <p>No execution plan available. Click "Explain Plan" in the toolbar to generate one.</p>
+        <p>No execution plan available. Click "Explain" in the toolbar to generate one.</p>
       </div>
     );
   }
@@ -87,10 +86,10 @@ export const ExplainPlanView: React.FC<ExplainPlanViewProps> = ({ steps, query }
         <div>
           <h4 className="font-semibold text-white flex items-center gap-1.5">
             <GitCommit className="w-4 h-4 text-purple-400" />
-            WebAssembly Query Execution Plan
+            Query Execution Plan
           </h4>
           <p className="text-[11px] text-[#858585] mt-0.5">
-            Engine pipeline breakdown: cost estimates, indexing paths, and SIMD/memory scans.
+            Cost estimates, index scans, and join operations.
           </p>
         </div>
       </div>

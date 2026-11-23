@@ -1,136 +1,8 @@
 import {
-  DatabaseType,
-  DatabaseDriverInfo,
-  DatabaseConnection,
-  SchemaDefinition,
   TableDefinition,
-  QueryResult,
-  ExecutionPlanStep,
+  ViewDefinition,
+  ProcedureDefinition,
 } from '../types/database';
-
-export const DATABASE_DRIVERS: DatabaseDriverInfo[] = [
-  {
-    id: 'sqlite',
-    name: 'SQLite (WebAssembly)',
-    category: 'relational',
-    defaultPort: 0,
-    icon: 'Feather',
-    color: '#003B57',
-    description: 'Embedded, zero-latency in-memory SQLite compiled directly to WebAssembly.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'duckdb',
-    name: 'DuckDB (WASM Columnar)',
-    category: 'analytical',
-    defaultPort: 0,
-    icon: 'Boxes',
-    color: '#FFF000',
-    description: 'Fast in-process analytical columnar database with vectorized execution in WASM.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'postgres',
-    name: 'PostgreSQL',
-    category: 'relational',
-    defaultPort: 5432,
-    icon: 'Database',
-    color: '#336791',
-    description: 'The world\'s most advanced open source relational database with JSONB and extensions.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'mysql',
-    name: 'MySQL',
-    category: 'relational',
-    defaultPort: 3306,
-    icon: 'Cpu',
-    color: '#00758F',
-    description: 'Fast, reliable web database powering millions of enterprise and web applications.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'mariadb',
-    name: 'MariaDB',
-    category: 'relational',
-    defaultPort: 3306,
-    icon: 'Server',
-    color: '#C0715D',
-    description: 'Community-developed, high-performance fork of MySQL with columnar engines.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'oracle',
-    name: 'Oracle Database',
-    category: 'relational',
-    defaultPort: 1521,
-    icon: 'Layers',
-    color: '#F80000',
-    description: 'Mission-critical enterprise RDBMS with multi-tenant architectures and PL/SQL.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'sqlserver',
-    name: 'Microsoft SQL Server',
-    category: 'relational',
-    defaultPort: 1433,
-    icon: 'Grid',
-    color: '#CC292B',
-    description: 'Enterprise relational database with T-SQL, columnstore indexes, and In-Memory OLTP.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'clickhouse',
-    name: 'ClickHouse OLAP',
-    category: 'analytical',
-    defaultPort: 8123,
-    icon: 'BarChart2',
-    color: '#FAFF00',
-    description: 'Ultra-fast open-source column-oriented database for real-time analytical reporting.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'snowflake',
-    name: 'Snowflake Data Cloud',
-    category: 'analytical',
-    defaultPort: 443,
-    icon: 'Snowflake',
-    color: '#29B5E8',
-    description: 'Cloud data warehouse with decoupled storage/compute and zero-copy cloning.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'mongodb',
-    name: 'MongoDB',
-    category: 'nosql',
-    defaultPort: 27017,
-    icon: 'FileCode',
-    color: '#13AA52',
-    description: 'Flexible document database with dynamic schemas, aggregations, and BSON.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-  {
-    id: 'redis',
-    name: 'Redis',
-    category: 'nosql',
-    defaultPort: 6379,
-    icon: 'Zap',
-    color: '#D82C20',
-    description: 'In-memory data structure store used as a database, cache, and message broker.',
-    wasmSupported: true,
-    sampleDbAvailable: true,
-  },
-];
 
 export const INITIAL_ECOMMERCE_TABLES: TableDefinition[] = [
   {
@@ -433,9 +305,7 @@ export const INITIAL_DEMO_DATA: Record<string, Record<string, any>[]> = {
     { department_id: 100, department_name: 'Finance & Accounting', manager_id: 108, location_id: 1700 },
     { department_id: 110, department_name: 'Accounting Operations', manager_id: 205, location_id: 1700 },
   ],
-  dual: [
-    { dummy: 'X' },
-  ],
+  dual: [{ dummy: 'X' }],
   inventory_logs: [
     { log_id: 1, product_id: 1, change_qty: 150, reason: 'Initial batch warehouse receipt', logged_by: 'SYSTEM_SVC', log_time: '2026-04-01 08:00:00' },
     { log_id: 2, product_id: 2, change_qty: 45, reason: 'Vendor shipment PO-9811', logged_by: 'JMILLER_AZURE', log_time: '2026-04-05 10:15:00' },
@@ -446,308 +316,114 @@ export const INITIAL_DEMO_DATA: Record<string, Record<string, any>[]> = {
   ],
 };
 
-export const ORACLE_HR_TABLES: TableDefinition[] = [
+export const INITIAL_ECOMMERCE_VIEWS: ViewDefinition[] = [
   {
-    name: 'employees',
-    schema: 'HR',
-    rowCount: 8,
+    name: 'vw_customer_orders',
+    schema: 'public',
     columns: [
-      { name: 'employee_id', type: 'NUMBER(6)', nullable: false, primaryKey: true },
-      { name: 'first_name', type: 'VARCHAR2(20)', nullable: true, primaryKey: false },
-      { name: 'last_name', type: 'VARCHAR2(25)', nullable: false, primaryKey: false },
-      { name: 'email', type: 'VARCHAR2(50)', nullable: false, primaryKey: false },
-      { name: 'hire_date', type: 'DATE', nullable: false, primaryKey: false },
-      { name: 'job_id', type: 'VARCHAR2(10)', nullable: false, primaryKey: false },
-      { name: 'salary', type: 'NUMBER(8,2)', nullable: false, primaryKey: false },
-      { name: 'department_id', type: 'NUMBER(4)', nullable: true, primaryKey: false },
+      { name: 'customer_id', type: 'INTEGER', nullable: false, primaryKey: false },
+      { name: 'first_name', type: 'VARCHAR(50)', nullable: false, primaryKey: false },
+      { name: 'last_name', type: 'VARCHAR(50)', nullable: false, primaryKey: false },
+      { name: 'email', type: 'VARCHAR(100)', nullable: false, primaryKey: false },
+      { name: 'order_id', type: 'INTEGER', nullable: false, primaryKey: false },
+      { name: 'order_date', type: 'TIMESTAMP', nullable: false, primaryKey: false },
+      { name: 'status', type: 'VARCHAR(20)', nullable: false, primaryKey: false },
+      { name: 'total_amount', type: 'DECIMAL(10,2)', nullable: false, primaryKey: false },
     ],
-    indexes: [
-      { name: 'emp_emp_id_pk', columns: ['employee_id'], unique: true },
-      { name: 'emp_email_uk', columns: ['email'], unique: true },
-    ],
-    ddl: `CREATE TABLE employees (
-  employee_id INTEGER PRIMARY KEY,
-  first_name VARCHAR(20),
-  last_name VARCHAR(25) NOT NULL,
-  email VARCHAR(50) NOT NULL UNIQUE,
-  hire_date DATE NOT NULL,
-  job_id VARCHAR(10) NOT NULL,
-  salary DECIMAL(8,2) NOT NULL,
-  department_id INTEGER
-);`,
+    definition: `CREATE VIEW vw_customer_orders AS
+SELECT
+  c.id AS customer_id,
+  c.first_name,
+  c.last_name,
+  c.email,
+  o.id AS order_id,
+  o.order_date,
+  o.status,
+  o.total_amount
+FROM customers c
+JOIN orders o ON c.id = o.customer_id;`,
   },
   {
-    name: 'departments',
-    schema: 'HR',
-    rowCount: 4,
+    name: 'vw_product_sales',
+    schema: 'public',
     columns: [
-      { name: 'department_id', type: 'NUMBER(4)', nullable: false, primaryKey: true },
-      { name: 'department_name', type: 'VARCHAR2(30)', nullable: false, primaryKey: false },
-      { name: 'manager_id', type: 'NUMBER(6)', nullable: true, primaryKey: false },
-      { name: 'location_id', type: 'NUMBER(4)', nullable: true, primaryKey: false },
+      { name: 'product_id', type: 'INTEGER', nullable: false, primaryKey: false },
+      { name: 'sku', type: 'VARCHAR(30)', nullable: false, primaryKey: false },
+      { name: 'title', type: 'VARCHAR(150)', nullable: false, primaryKey: false },
+      { name: 'category_name', type: 'VARCHAR(50)', nullable: false, primaryKey: false },
+      { name: 'price', type: 'DECIMAL(10,2)', nullable: false, primaryKey: false },
+      { name: 'total_sold', type: 'INTEGER', nullable: true, primaryKey: false },
+      { name: 'total_revenue', type: 'DECIMAL(10,2)', nullable: true, primaryKey: false },
     ],
-    indexes: [
-      { name: 'dept_id_pk', columns: ['department_id'], unique: true },
-    ],
-    ddl: `CREATE TABLE departments (
-  department_id INTEGER PRIMARY KEY,
-  department_name VARCHAR(30) NOT NULL,
-  manager_id INTEGER,
-  location_id INTEGER
-);`,
+    definition: `CREATE VIEW vw_product_sales AS
+SELECT
+  p.id AS product_id,
+  p.sku,
+  p.title,
+  cat.name AS category_name,
+  p.price,
+  COALESCE(SUM(oi.quantity), 0) AS total_sold,
+  ROUND(COALESCE(SUM(oi.subtotal), 0), 2) AS total_revenue
+FROM products p
+JOIN categories cat ON p.category_id = cat.id
+LEFT JOIN order_items oi ON p.id = oi.product_id
+GROUP BY p.id, p.sku, p.title, cat.name, p.price;`,
   },
   {
-    name: 'dual',
-    schema: 'SYS',
-    rowCount: 1,
+    name: 'vw_active_products',
+    schema: 'public',
     columns: [
-      { name: 'dummy', type: 'VARCHAR2(1)', nullable: false, primaryKey: false },
+      { name: 'id', type: 'INTEGER', nullable: false, primaryKey: false },
+      { name: 'sku', type: 'VARCHAR(30)', nullable: false, primaryKey: false },
+      { name: 'title', type: 'VARCHAR(150)', nullable: false, primaryKey: false },
+      { name: 'price', type: 'DECIMAL(10,2)', nullable: false, primaryKey: false },
+      { name: 'stock_quantity', type: 'INTEGER', nullable: false, primaryKey: false },
     ],
-    ddl: `CREATE TABLE dual (
-  dummy VARCHAR(1)
-);`,
-  },
-  {
-    name: 'customers',
-    schema: 'HR',
-    rowCount: 8,
-    columns: INITIAL_ECOMMERCE_TABLES[0].columns,
-    ddl: INITIAL_ECOMMERCE_TABLES[0].ddl,
+    definition: `CREATE VIEW vw_active_products AS
+SELECT id, sku, title, price, stock_quantity, rating
+FROM products
+WHERE stock_quantity > 0;`,
   },
 ];
 
-export const SQLSERVER_DBO_TABLES: TableDefinition[] = [
+export const INITIAL_ECOMMERCE_PROCEDURES: ProcedureDefinition[] = [
   {
-    name: 'inventory_logs',
-    schema: 'dbo',
-    rowCount: 6,
-    columns: [
-      { name: 'log_id', type: 'INT', nullable: false, primaryKey: true },
-      { name: 'product_id', type: 'INT', nullable: false, primaryKey: false },
-      { name: 'change_qty', type: 'INT', nullable: false, primaryKey: false },
-      { name: 'reason', type: 'NVARCHAR(100)', nullable: false, primaryKey: false },
-      { name: 'logged_by', type: 'NVARCHAR(50)', nullable: false, primaryKey: false },
-      { name: 'log_time', type: 'DATETIME2', nullable: false, primaryKey: false, defaultValue: 'GETDATE()' },
-    ],
-    indexes: [
-      { name: 'PK_inventory_logs', columns: ['log_id'], unique: true },
-      { name: 'IX_inventory_product', columns: ['product_id'], unique: false },
-    ],
-    ddl: `CREATE TABLE inventory_logs (
-  log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  product_id INTEGER NOT NULL,
-  change_qty INTEGER NOT NULL,
-  reason VARCHAR(100) NOT NULL,
-  logged_by VARCHAR(50) NOT NULL,
-  log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);`,
-  },
-  INITIAL_ECOMMERCE_TABLES[0],
-  INITIAL_ECOMMERCE_TABLES[2],
-  INITIAL_ECOMMERCE_TABLES[3],
-];
-
-export const INITIAL_CONNECTIONS: DatabaseConnection[] = [
-  {
-    id: 'conn_sqlite_wasm',
-    name: 'Production SQLite (WASM In-Memory)',
-    type: 'sqlite',
-    host: 'localhost',
-    port: 0,
-    database: 'ecommerce_prod.db',
-    username: 'admin',
-    ssl: false,
-    colorBadge: '#003B57',
-    status: 'connected',
-    isWasmNative: true,
-    version: 'SQLite 3.45 (WebAssembly x86_64)',
-    pingMs: 0.8,
-    schemas: [
-      {
-        name: 'main',
-        tables: INITIAL_ECOMMERCE_TABLES,
-      },
-    ],
+    name: 'sp_get_customer_orders',
+    schema: 'public',
+    parameters: '@customer_id INT = NULL',
+    definition: `CREATE PROCEDURE sp_get_customer_orders (@customer_id INT = NULL)
+AS
+BEGIN
+  SELECT c.id AS customer_id, c.first_name, c.last_name, o.id AS order_id, o.order_date, o.status, o.total_amount
+  FROM customers c
+  JOIN orders o ON c.id = o.customer_id
+  WHERE @customer_id IS NULL OR c.id = @customer_id
+  ORDER BY o.order_date DESC;
+END;`,
   },
   {
-    id: 'conn_postgres_cloud',
-    name: 'PostgreSQL - Analytics Cluster',
-    type: 'postgres',
-    host: 'db.prod.us-east.aws.neon.tech',
-    port: 5432,
-    database: 'telemetry_warehouse',
-    username: 'postgres_admin',
-    ssl: true,
-    colorBadge: '#336791',
-    status: 'connected',
-    isWasmNative: true,
-    version: 'PostgreSQL 16.2 on x86_64-pc-linux-gnu',
-    pingMs: 14.2,
-    schemas: [
-      {
-        name: 'public',
-        tables: INITIAL_ECOMMERCE_TABLES,
-      },
-    ],
+    name: 'sp_sales_by_category',
+    schema: 'public',
+    parameters: '',
+    definition: `CREATE PROCEDURE sp_sales_by_category
+AS
+BEGIN
+  SELECT cat.name AS category, COUNT(DISTINCT p.id) AS product_count, ROUND(COALESCE(SUM(oi.subtotal), 0), 2) AS total_revenue
+  FROM categories cat
+  LEFT JOIN products p ON cat.id = p.category_id
+  LEFT JOIN order_items oi ON p.id = oi.product_id
+  GROUP BY cat.id, cat.name
+  ORDER BY total_revenue DESC;
+END;`,
   },
   {
-    id: 'conn_duckdb_wasm',
-    name: 'DuckDB OLAP (WASM Columnar)',
-    type: 'duckdb',
-    host: 'memory',
-    port: 0,
-    database: 'metrics_vectorized.duckdb',
-    username: 'analyst',
-    ssl: false,
-    colorBadge: '#E6A700',
-    status: 'connected',
-    isWasmNative: true,
-    version: 'DuckDB v0.10.0 (WASM Vectorized)',
-    pingMs: 0.4,
-    schemas: [
-      {
-        name: 'main',
-        tables: INITIAL_ECOMMERCE_TABLES.slice(0, 4),
-      },
-    ],
-  },
-  {
-    id: 'conn_mysql_replica',
-    name: 'MySQL 8.0 - Master Cluster',
-    type: 'mysql',
-    host: 'mysql-cluster.internal.net',
-    port: 3306,
-    database: 'app_master',
-    username: 'db_root',
-    ssl: true,
-    colorBadge: '#00758F',
-    status: 'connected',
-    isWasmNative: true,
-    version: 'MySQL 8.0.36 Community Server',
-    pingMs: 18.5,
-    schemas: [
-      {
-        name: 'app_master',
-        tables: INITIAL_ECOMMERCE_TABLES,
-      },
-    ],
-  },
-  {
-    id: 'conn_oracle_enterprise',
-    name: 'Oracle Database 23c Free (HR)',
-    type: 'oracle',
-    host: 'oracle-db.corp.internal',
-    port: 1521,
-    database: 'FREEPDB1',
-    username: 'hr_admin',
-    ssl: true,
-    colorBadge: '#F80000',
-    status: 'connected',
-    isWasmNative: true,
-    version: 'Oracle Database 23c Free Release 23.0.0.0.0 - Production (WASM Native)',
-    pingMs: 11.4,
-    schemas: [
-      {
-        name: 'HR',
-        tables: ORACLE_HR_TABLES,
-      },
-    ],
-  },
-  {
-    id: 'conn_sqlserver_azure',
-    name: 'MS SQL Server 2022 (Azure)',
-    type: 'sqlserver',
-    host: 'sql-prod-eastus.database.windows.net',
-    port: 1433,
-    database: 'EnterpriseDB',
-    username: 'sa_cloud',
-    ssl: true,
-    colorBadge: '#CC292B',
-    status: 'connected',
-    isWasmNative: true,
-    version: 'Microsoft SQL Server 2022 (RTM) - 16.0.1000.6 (X64)',
-    pingMs: 9.8,
-    schemas: [
-      {
-        name: 'dbo',
-        tables: SQLSERVER_DBO_TABLES,
-      },
-    ],
+    name: 'sp_restock_product',
+    schema: 'public',
+    parameters: '@product_id INT, @quantity INT',
+    definition: `CREATE PROCEDURE sp_restock_product (@product_id INT, @quantity INT)
+AS
+BEGIN
+  UPDATE products SET stock_quantity = stock_quantity + @quantity WHERE id = @product_id;
+END;`,
   },
 ];
-
-export function generateExecutionPlan(query: string): ExecutionPlanStep[] {
-  const q = query.trim().toUpperCase();
-
-  const steps: ExecutionPlanStep[] = [];
-  let stepId = 1;
-
-  if (q.includes('JOIN')) {
-    steps.push({
-      id: stepId++,
-      operation: 'HASH JOIN',
-      target: 'INNER JOIN (Hash)',
-      cost: '14.2..38.5',
-      rowsEstimate: 24,
-      details: 'Hash Cond: orders.customer_id = customers.id (WASM Vectorized Pipeline)',
-      children: [
-        {
-          id: stepId++,
-          operation: 'SCAN TABLE',
-          target: 'orders',
-          cost: '0.0..12.5',
-          rowsEstimate: 8,
-          details: 'Sequential scan on orders in WASM memory space',
-        },
-        {
-          id: stepId++,
-          operation: 'SEARCH TABLE USING INDEX',
-          target: 'customers',
-          cost: '0.0..8.2',
-          rowsEstimate: 8,
-          details: 'B-Tree Index Scan using pk_customers_id',
-        },
-      ],
-    });
-  } else if (q.includes('WHERE') && (q.includes('ID =') || q.includes('ID='))) {
-    steps.push({
-      id: stepId++,
-      operation: 'SEARCH TABLE USING INDEX',
-      target: 'Primary Key Index',
-      cost: '0.0..2.1',
-      rowsEstimate: 1,
-      details: 'Point lookup via B-Tree Index (O(log N) lookup in WASM memory)',
-    });
-  } else {
-    steps.push({
-      id: stepId++,
-      operation: 'SCAN TABLE',
-      target: 'Full Table Scan',
-      cost: '0.0..10.5',
-      rowsEstimate: 10,
-      details: 'Fast contiguous memory block read via WebAssembly 32-bit linear address space',
-    });
-  }
-
-  if (q.includes('GROUP BY') || q.includes('COUNT(') || q.includes('SUM(') || q.includes('AVG(')) {
-    steps.push({
-      id: stepId++,
-      operation: 'AGGREGATE / HASH GROUP',
-      cost: '22.0..35.0',
-      rowsEstimate: 5,
-      details: 'In-memory hash aggregation table with SIMD-assisted hashing',
-    });
-  }
-
-  if (q.includes('ORDER BY')) {
-    steps.push({
-      id: stepId++,
-      operation: 'SORT (B-TREE / QUICKSORT)',
-      cost: '12.0..18.0',
-      rowsEstimate: 10,
-      details: 'Top-N Heapsort in WASM heap buffer',
-    });
-  }
-
-  return steps;
-}

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { TableDefinition, ColumnDefinition } from '../../types/database';
+import { TableDefinition, ColumnDefinition, DatabaseType } from '../../types/database';
 import {
+  COMMON_COLUMN_TYPES,
   generateAddColumnSql,
   generateRenameColumnSql,
   generateDropColumnSql,
+  generateRenameTableSql,
 } from '../../utils/tableManagement';
 import {
   X,
@@ -14,22 +16,167 @@ import {
   Columns,
   Check,
   AlertCircle,
-  Code2,
 } from 'lucide-react';
 
 interface EditColumnsModalProps {
   isOpen: boolean;
   table: TableDefinition;
+  dialect?: DatabaseType;
   onClose: () => void;
-  onExecuteAlter: (ddlSql: string, updatedTable: TableDefinition) => Promise<void>;
+  onExecuteAlter: (
+    ddlSql: string,
+    updatedTable: TableDefinition,
+    oldTableName?: string
+  ) => Promise<void>;
+}
+
+function TableNameHeaderEditor({
+  isRenaming,
+  currentName,
+  draft,
+  onDraftChange,
+  onStartRename,
+  onConfirmRename,
+  onCancelRename,
+}: {
+  isRenaming: boolean;
+  currentName: string;
+  draft: string;
+  onDraftChange: (val: string) => void;
+  onStartRename: () => void;
+  onConfirmRename: () => void;
+  onCancelRename: () => void;
+}) {
+  if (isRenaming) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <input
+          type="text"
+          value={draft}
+          autoFocus
+          onChange={(e) => onDraftChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onConfirmRename();
+            if (e.key === 'Escape') onCancelRename();
+          }}
+          className="bg-[#111111] border border-[#007acc] text-white px-2 py-0.5 rounded outline-none text-xs font-mono"
+        />
+        <button
+          onClick={onConfirmRename}
+          className="text-emerald-400 p-1 hover:bg-[#3c3c3c] rounded"
+          title="Confirm Rename Table"
+        >
+          <Check className="w-3.5 h-3.5" />
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-sky-400 font-mono">{currentName}</span>
+      <button
+        onClick={onStartRename}
+        className="text-[#858585] hover:text-white p-0.5 rounded hover:bg-[#3c3c3c]"
+        title="Rename Table"
+      >
+        <Edit2 className="w-3.5 h-3.5" />
+      </button>
+    </span>
+  );
+}
+
+function ExistingColumnRow({
+  col,
+  isRenaming,
+  renameDraft,
+  onDraftChange,
+  onStartRename,
+  onConfirmRename,
+  onCancelRename,
+  onDropColumn,
+}: {
+  col: ColumnDefinition;
+  isRenaming: boolean;
+  renameDraft: string;
+  onDraftChange: (val: string) => void;
+  onStartRename: () => void;
+  onConfirmRename: () => void;
+  onCancelRename: () => void;
+  onDropColumn: () => void;
+}) {
+  return (
+    <tr className="border-b border-[#2d2d2d] hover:bg-[#252526] transition-colors">
+      <td className="py-2 px-3 font-semibold text-white">
+        {isRenaming ? (
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={renameDraft}
+              autoFocus
+              onChange={(e) => onDraftChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onConfirmRename();
+                if (e.key === 'Escape') onCancelRename();
+              }}
+              className="bg-[#111111] border border-[#007acc] text-white px-1.5 py-0.5 rounded outline-none text-xs"
+            />
+            <button
+              onClick={onConfirmRename}
+              className="text-emerald-400 p-1 hover:bg-[#333333] rounded"
+              title="Confirm Rename"
+            >
+              <Check className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            {col.primaryKey && (
+              <span title="Primary Key">
+                <Key className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              </span>
+            )}
+            <span>{col.name}</span>
+          </div>
+        )}
+      </td>
+      <td className="py-2 px-3 font-mono text-emerald-400">{col.type}</td>
+      <td className="py-2 px-3 text-[#858585]">{col.nullable ? 'YES' : 'NO'}</td>
+      <td className="py-2 px-3 font-mono text-[#858585]">{col.defaultValue ?? '-'}</td>
+      <td className="py-2 px-3 text-right">
+        <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={onStartRename}
+            className="p-1 hover:bg-[#3c3c3c] rounded text-[#858585] hover:text-white"
+            title="Rename Column"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
+          {!col.primaryKey && (
+            <button
+              onClick={onDropColumn}
+              className="p-1 hover:bg-rose-900/60 rounded text-[#858585] hover:text-rose-400"
+              title={`Drop Column ${col.name}`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
 }
 
 export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
   isOpen,
   table,
+  dialect = 'sqlite',
   onClose,
   onExecuteAlter,
 }) => {
+  const [currentTableName, setCurrentTableName] = useState(table.name);
+  const [tableNameDraft, setTableNameDraft] = useState(table.name);
+  const [isRenamingTable, setIsRenamingTable] = useState(false);
   const [columns, setColumns] = useState<ColumnDefinition[]>([...table.columns]);
   const [newColName, setNewColName] = useState('');
   const [newColType, setNewColType] = useState('VARCHAR(100)');
@@ -42,43 +189,74 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
 
   if (!isOpen) return null;
 
+  const runAlterAction = async (
+    ddl: string,
+    updatedTable: TableDefinition,
+    successText: string,
+    onSuccess: () => void
+  ) => {
+    setIsExecuting(true);
+    setStatusMessage(null);
+    try {
+      await onExecuteAlter(ddl, updatedTable, currentTableName);
+      onSuccess();
+      setStatusMessage({ text: successText });
+    } catch (err: any) {
+      const msg = err ? String(err.message || err) : 'Failed to alter table';
+      setStatusMessage({ text: msg, error: true });
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handleRenameTable = async () => {
+    const newTblName = tableNameDraft.trim();
+    if (!newTblName || newTblName === currentTableName) {
+      setIsRenamingTable(false);
+      return;
+    }
+
+    const ddl = generateRenameTableSql(currentTableName, newTblName, dialect);
+    const updatedTable: TableDefinition = { ...table, name: newTblName, columns };
+    await runAlterAction(
+      ddl,
+      updatedTable,
+      `Renamed table to "${newTblName}" (${ddl})`,
+      () => {
+        setCurrentTableName(newTblName);
+        setIsRenamingTable(false);
+      }
+    );
+  };
+
   const handleAddColumn = async () => {
-    if (!newColName.trim()) {
+    const cleanName = newColName.trim();
+    if (!cleanName) {
       setStatusMessage({ text: 'Column name cannot be empty', error: true });
       return;
     }
-    if (columns.some((c) => c.name.toLowerCase() === newColName.trim().toLowerCase())) {
+    if (columns.some((c) => c.name.toLowerCase() === cleanName.toLowerCase())) {
       setStatusMessage({ text: 'A column with this name already exists', error: true });
       return;
     }
 
+    const defaultVal = newColDefault.trim();
     const newCol: ColumnDefinition = {
-      name: newColName.trim(),
+      name: cleanName,
       type: newColType,
       nullable: newColNullable,
       primaryKey: false,
-      defaultValue: newColDefault.trim() || undefined,
+      defaultValue: defaultVal ? defaultVal : undefined,
     };
 
-    const ddl = generateAddColumnSql(table.name, newCol);
-    setIsExecuting(true);
-    setStatusMessage(null);
-
-    try {
-      const updatedTable: TableDefinition = {
-        ...table,
-        columns: [...columns, newCol],
-      };
-      await onExecuteAlter(ddl, updatedTable);
-      setColumns(updatedTable.columns);
+    const ddl = generateAddColumnSql(currentTableName, newCol, dialect);
+    const updatedCols = [...columns, newCol];
+    const updatedTable: TableDefinition = { ...table, name: currentTableName, columns: updatedCols };
+    await runAlterAction(ddl, updatedTable, `Added column "${newCol.name}".`, () => {
+      setColumns(updatedCols);
       setNewColName('');
       setNewColDefault('');
-      setStatusMessage({ text: `Added column "${newCol.name}" via WebAssembly ALTER TABLE.` });
-    } catch (err: any) {
-      setStatusMessage({ text: err?.message || 'Failed to alter table', error: true });
-    } finally {
-      setIsExecuting(false);
-    }
+    });
   };
 
   const handleRenameColumn = async (colIdx: number) => {
@@ -89,25 +267,18 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
       return;
     }
 
-    const ddl = generateRenameColumnSql(table.name, oldCol.name, newName);
-    setIsExecuting(true);
-    setStatusMessage(null);
-
-    try {
-      const updatedCols = columns.map((c, i) => (i === colIdx ? { ...c, name: newName } : c));
-      const updatedTable: TableDefinition = {
-        ...table,
-        columns: updatedCols,
-      };
-      await onExecuteAlter(ddl, updatedTable);
-      setColumns(updatedCols);
-      setRenamingIdx(null);
-      setStatusMessage({ text: `Renamed column "${oldCol.name}" to "${newName}".` });
-    } catch (err: any) {
-      setStatusMessage({ text: err?.message || 'Failed to rename column', error: true });
-    } finally {
-      setIsExecuting(false);
-    }
+    const ddl = generateRenameColumnSql(currentTableName, oldCol.name, newName, dialect);
+    const updatedCols = columns.map((c, i) => (i === colIdx ? { ...c, name: newName } : c));
+    const updatedTable: TableDefinition = { ...table, name: currentTableName, columns: updatedCols };
+    await runAlterAction(
+      ddl,
+      updatedTable,
+      `Renamed column "${oldCol.name}" to "${newName}".`,
+      () => {
+        setColumns(updatedCols);
+        setRenamingIdx(null);
+      }
+    );
   };
 
   const handleDropColumn = async (colName: string) => {
@@ -116,24 +287,12 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
       return;
     }
 
-    const ddl = generateDropColumnSql(table.name, colName);
-    setIsExecuting(true);
-    setStatusMessage(null);
-
-    try {
-      const updatedCols = columns.filter((c) => c.name !== colName);
-      const updatedTable: TableDefinition = {
-        ...table,
-        columns: updatedCols,
-      };
-      await onExecuteAlter(ddl, updatedTable);
+    const ddl = generateDropColumnSql(currentTableName, colName, dialect);
+    const updatedCols = columns.filter((c) => c.name !== colName);
+    const updatedTable: TableDefinition = { ...table, name: currentTableName, columns: updatedCols };
+    await runAlterAction(ddl, updatedTable, `Dropped column "${colName}".`, () => {
       setColumns(updatedCols);
-      setStatusMessage({ text: `Dropped column "${colName}".` });
-    } catch (err: any) {
-      setStatusMessage({ text: err?.message || 'Failed to drop column', error: true });
-    } finally {
-      setIsExecuting(false);
-    }
+    });
   };
 
   return (
@@ -145,16 +304,27 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
         className="bg-[#252526] border border-[#3c3c3c] rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col text-xs"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-[#2d2d2d] border-b border-[#3c3c3c]">
           <div className="flex items-center gap-2">
             <Columns className="w-5 h-5 text-sky-400" />
             <div>
-              <h3 className="font-bold text-white text-sm">
-                Edit Table Structure: <span className="text-sky-400 font-mono">{table.name}</span>
+              <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                <span>Edit Table Structure:</span>
+                <TableNameHeaderEditor
+                  isRenaming={isRenamingTable}
+                  currentName={currentTableName}
+                  draft={tableNameDraft}
+                  onDraftChange={setTableNameDraft}
+                  onStartRename={() => {
+                    setTableNameDraft(currentTableName);
+                    setIsRenamingTable(true);
+                  }}
+                  onConfirmRename={handleRenameTable}
+                  onCancelRename={() => setIsRenamingTable(false)}
+                />
               </h3>
               <p className="text-[11px] text-[#858585]">
-                Add, rename, or drop columns using live WebAssembly ALTER TABLE operations
+                Rename table or add, rename, and drop columns
               </p>
             </div>
           </div>
@@ -167,7 +337,6 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
           </button>
         </div>
 
-        {/* Status message banner */}
         {statusMessage && (
           <div
             className={`px-4 py-2 border-b flex items-center gap-2 text-xs ${
@@ -185,14 +354,12 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
           </div>
         )}
 
-        {/* Modal Body */}
         <div className="p-5 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
-          {/* Existing Columns Table */}
           <div>
             <h4 className="font-semibold text-white mb-2 flex items-center justify-between">
               <span>Existing Columns ({columns.length})</span>
               <span className="text-[11px] text-[#858585] font-normal">
-                Double-click name or click edit to rename
+                Click edit to rename
               </span>
             </h4>
 
@@ -209,81 +376,26 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
                 </thead>
                 <tbody>
                   {columns.map((col, idx) => (
-                    <tr
+                    <ExistingColumnRow
                       key={col.name}
-                      className="border-b border-[#2d2d2d] hover:bg-[#252526] transition-colors"
-                    >
-                      <td className="py-2 px-3 font-semibold text-white">
-                        {renamingIdx === idx ? (
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={renameDraft}
-                              autoFocus
-                              onChange={(e) => setRenameDraft(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleRenameColumn(idx);
-                                if (e.key === 'Escape') setRenamingIdx(null);
-                              }}
-                              className="bg-[#111111] border border-[#007acc] text-white px-1.5 py-0.5 rounded outline-none text-xs"
-                            />
-                            <button
-                              onClick={() => handleRenameColumn(idx)}
-                              className="text-emerald-400 p-1 hover:bg-[#333333] rounded"
-                              title="Confirm Rename"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            {col.primaryKey && (
-                              <span title="Primary Key">
-                                <Key className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                              </span>
-                            )}
-                            <span>{col.name}</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-2 px-3 font-mono text-emerald-400">{col.type}</td>
-                      <td className="py-2 px-3 text-[#858585]">
-                        {col.nullable ? 'YES' : 'NO'}
-                      </td>
-                      <td className="py-2 px-3 font-mono text-[#858585]">
-                        {col.defaultValue ?? '-'}
-                      </td>
-                      <td className="py-2 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => {
-                              setRenamingIdx(idx);
-                              setRenameDraft(col.name);
-                            }}
-                            className="p-1 hover:bg-[#3c3c3c] rounded text-[#858585] hover:text-white"
-                            title="Rename Column"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          {!col.primaryKey && (
-                            <button
-                              onClick={() => handleDropColumn(col.name)}
-                              className="p-1 hover:bg-rose-900/60 rounded text-[#858585] hover:text-rose-400"
-                              title={`Drop Column ${col.name}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                      col={col}
+                      isRenaming={renamingIdx === idx}
+                      renameDraft={renameDraft}
+                      onDraftChange={setRenameDraft}
+                      onStartRename={() => {
+                        setRenamingIdx(idx);
+                        setRenameDraft(col.name);
+                      }}
+                      onConfirmRename={() => handleRenameColumn(idx)}
+                      onCancelRename={() => setRenamingIdx(null)}
+                      onDropColumn={() => handleDropColumn(col.name)}
+                    />
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Add New Column Form */}
           <div className="p-4 bg-[#1e1e1e] border border-[#3c3c3c] rounded-lg space-y-3">
             <h4 className="font-semibold text-white flex items-center gap-1.5">
               <Plus className="w-4 h-4 text-emerald-400" />
@@ -292,7 +404,9 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
               <div className="sm:col-span-2">
-                <label className="block text-[#858585] mb-1 font-mono text-[11px]">Column Name</label>
+                <label className="block text-[#858585] mb-1 font-mono text-[11px]">
+                  Column Name
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. phone, status, age"
@@ -309,18 +423,18 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
                   onChange={(e) => setNewColType(e.target.value)}
                   className="w-full bg-[#252526] border border-[#3c3c3c] focus:border-[#007acc] rounded px-2 py-1.5 text-white outline-none font-mono"
                 >
-                  <option value="VARCHAR(100)">VARCHAR(100)</option>
-                  <option value="VARCHAR(255)">VARCHAR(255)</option>
-                  <option value="INTEGER">INTEGER</option>
-                  <option value="TEXT">TEXT</option>
-                  <option value="DECIMAL(10,2)">DECIMAL(10,2)</option>
-                  <option value="TIMESTAMP">TIMESTAMP</option>
-                  <option value="BOOLEAN">BOOLEAN</option>
+                  {COMMON_COLUMN_TYPES.map((typeOption) => (
+                    <option key={typeOption} value={typeOption}>
+                      {typeOption}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-[#858585] mb-1 font-mono text-[11px]">Default Value</label>
+                <label className="block text-[#858585] mb-1 font-mono text-[11px]">
+                  Default Value
+                </label>
                 <input
                   type="text"
                   placeholder="NULL / 'Active'"
@@ -357,7 +471,6 @@ export const EditColumnsModal: React.FC<EditColumnsModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end px-5 py-3 bg-[#2d2d2d] border-t border-[#3c3c3c]">
           <button
             onClick={onClose}

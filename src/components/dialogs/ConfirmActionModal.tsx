@@ -69,7 +69,7 @@ export const ConfirmActionModal: React.FC<ConfirmActionModalProps> = ({
           {sqlStatement && (
             <div>
               <span className="block text-[11px] text-[#858585] mb-1 font-mono">
-                SQL Statement to be executed in WASM:
+                SQL Statement:
               </span>
               <pre className="bg-[#111111] border border-[#333333] rounded p-2.5 text-rose-300 font-mono text-xs select-text overflow-x-auto">
                 {sqlStatement}

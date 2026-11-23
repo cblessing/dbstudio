@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Search,
-  Code2,
-  Database,
-  LayoutGrid,
-  Play,
-  Wand2,
-  Download,
-  Plus,
-  Table,
-} from 'lucide-react';
+import { Search } from 'lucide-react';
 
 export interface CommandItem {
   id: string;

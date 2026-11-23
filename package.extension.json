@@ -26,6 +26,8 @@
   "main": "./out/extension.js",
   "activationEvents": [
     "onCommand:database-studio.open",
+    "onCommand:database-studio.newQuery",
+    "onCommand:database-studio.openErd",
     "onView:database-studio.sidebarView"
   ],
   "contributes": {
@@ -50,22 +52,45 @@
     "commands": [
       {
         "command": "database-studio.open",
-        "title": "Open Database Studio (Full View)",
+        "title": "Open Database Studio",
         "category": "Database Studio",
         "icon": "$(database)"
+      },
+      {
+        "command": "database-studio.newQuery",
+        "title": "New SQL Script",
+        "category": "Database Studio",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "database-studio.openErd",
+        "title": "Open ER Diagram",
+        "category": "Database Studio",
+        "icon": "$(type-hierarchy)"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "database-studio.open"
+        },
+        {
+          "command": "database-studio.newQuery"
+        },
+        {
+          "command": "database-studio.openErd"
         }
       ],
       "view/title": [
         {
-          "command": "database-studio.open",
+          "command": "database-studio.newQuery",
           "when": "view == database-studio.sidebarView",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "database-studio.openErd",
+          "when": "view == database-studio.sidebarView",
+          "group": "navigation@2"
         }
       ]
     }

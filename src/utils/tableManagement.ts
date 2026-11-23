@@ -1,38 +1,72 @@
-import { ColumnDefinition, TableDefinition, DatabaseType } from '../types/database';
+import { ColumnDefinition, DatabaseType } from '../types/database';
+
+export const COMMON_COLUMN_TYPES = [
+  'INTEGER',
+  'VARCHAR(100)',
+  'VARCHAR(255)',
+  'TEXT',
+  'DECIMAL(10,2)',
+  'TIMESTAMP',
+  'BOOLEAN',
+] as const;
+
+function cleanIdentifier(name: string): string {
+  return name.replace(/[`"\[\]]/g, '');
+}
+
+function quoteIdentifier(name: string, dialect: DatabaseType): string {
+  const clean = cleanIdentifier(name);
+  if (dialect === 'oracle') return `"${clean.toUpperCase()}"`;
+  if (dialect === 'sqlserver') return `[${clean}]`;
+  return `\`${clean}\``;
+}
+
+function qualifyTable(tableName: string, dialect: DatabaseType): string {
+  const clean = cleanIdentifier(tableName);
+  if (dialect === 'oracle') return `"${clean.toUpperCase()}"`;
+  if (dialect === 'sqlserver') return `[dbo].[${clean}]`;
+  return `\`${clean}\``;
+}
+
+function appendColumnConstraints(col: ColumnDefinition): string {
+  let suffix = '';
+  if (col.primaryKey) {
+    suffix += ' PRIMARY KEY';
+  } else if (!col.nullable) {
+    suffix += ' NOT NULL';
+  }
+  if (col.defaultValue) {
+    suffix += ` DEFAULT ${col.defaultValue}`;
+  }
+  return suffix;
+}
 
 export function generateDropTableSql(
   tableName: string,
   ifExists = true,
   dialect: DatabaseType = 'sqlite'
 ): string {
-  const cleanName = tableName.replace(/[`"\[\]]/g, '');
-
   if (dialect === 'oracle') {
-    return `DROP TABLE "${cleanName.toUpperCase()}" CASCADE CONSTRAINTS;`;
+    return `DROP TABLE ${qualifyTable(tableName, 'oracle')} CASCADE CONSTRAINTS;`;
   }
 
   if (dialect === 'sqlserver') {
-    return `IF OBJECT_ID(N'[dbo].[${cleanName}]', N'U') IS NOT NULL DROP TABLE [dbo].[${cleanName}];`;
+    const qualified = qualifyTable(tableName, 'sqlserver');
+    return `IF OBJECT_ID(N'${qualified}', N'U') IS NOT NULL DROP TABLE ${qualified};`;
   }
 
-  return `DROP TABLE ${ifExists ? 'IF EXISTS ' : ''}\`${cleanName}\`;`;
+  return `DROP TABLE ${ifExists ? 'IF EXISTS ' : ''}${qualifyTable(tableName, dialect)};`;
 }
 
 export function generateTruncateTableSql(
   tableName: string,
   dialect: DatabaseType = 'sqlite'
 ): string {
-  const cleanName = tableName.replace(/[`"\[\]]/g, '');
-
-  if (dialect === 'oracle') {
-    return `TRUNCATE TABLE "${cleanName.toUpperCase()}";`;
+  if (dialect === 'oracle' || dialect === 'sqlserver') {
+    return `TRUNCATE TABLE ${qualifyTable(tableName, dialect)};`;
   }
 
-  if (dialect === 'sqlserver') {
-    return `TRUNCATE TABLE [dbo].[${cleanName}];`;
-  }
-
-  return `DELETE FROM \`${cleanName}\`;`;
+  return `DELETE FROM ${qualifyTable(tableName, dialect)};`;
 }
 
 export function generateRenameTableSql(
@@ -40,18 +74,38 @@ export function generateRenameTableSql(
   newName: string,
   dialect: DatabaseType = 'sqlite'
 ): string {
-  const safeOld = oldName.replace(/[`"\[\]]/g, '');
-  const safeNew = newName.replace(/[`"\[\]]/g, '');
-
-  if (dialect === 'oracle') {
-    return `ALTER TABLE "${safeOld.toUpperCase()}" RENAME TO "${safeNew.toUpperCase()}";`;
-  }
+  const safeOld = cleanIdentifier(oldName);
+  const safeNew = cleanIdentifier(newName);
 
   if (dialect === 'sqlserver') {
     return `EXEC sp_rename 'dbo.${safeOld}', '${safeNew}';`;
   }
 
-  return `ALTER TABLE \`${safeOld}\` RENAME TO \`${safeNew}\`;`;
+  return `ALTER TABLE ${quoteIdentifier(safeOld, dialect)} RENAME TO ${quoteIdentifier(safeNew, dialect)};`;
+}
+
+function mapDialectAddColumnType(rawType: string, dialect: DatabaseType): string {
+  const upper = rawType.toUpperCase();
+  if (dialect === 'oracle' && upper === 'VARCHAR') return 'VARCHAR2(100)';
+  if (dialect === 'oracle' && upper === 'INTEGER') return 'NUMBER';
+  if (dialect === 'sqlserver' && upper === 'VARCHAR') return 'NVARCHAR(100)';
+  return rawType;
+}
+
+function buildColumnNullAndDefaultSuffix(
+  col: ColumnDefinition,
+  includeExplicitNull: boolean
+): string {
+  let suffix = '';
+  if (!col.nullable) {
+    suffix += ' NOT NULL';
+  } else if (includeExplicitNull) {
+    suffix += ' NULL';
+  }
+  if (col.defaultValue) {
+    suffix += ` DEFAULT ${col.defaultValue}`;
+  }
+  return suffix;
 }
 
 export function generateAddColumnSql(
@@ -59,39 +113,39 @@ export function generateAddColumnSql(
   col: ColumnDefinition,
   dialect: DatabaseType = 'sqlite'
 ): string {
-  const safeTable = tableName.replace(/[`"\[\]]/g, '');
-  const safeCol = col.name.replace(/[`"\[\]]/g, '');
+  const type = mapDialectAddColumnType(col.type, dialect);
+  const tableId = qualifyTable(tableName, dialect);
+  const colId = quoteIdentifier(col.name, dialect);
 
   if (dialect === 'oracle') {
-    let type = col.type;
-    if (type.toUpperCase() === 'VARCHAR') type = 'VARCHAR2(100)';
-    if (type.toUpperCase() === 'INTEGER') type = 'NUMBER';
-    let sql = `ALTER TABLE "${safeTable.toUpperCase()}" ADD ("${safeCol.toUpperCase()}" ${type}`;
-    if (!col.nullable) sql += ' NOT NULL';
-    if (col.defaultValue) sql += ` DEFAULT ${col.defaultValue}`;
-    sql += ');';
-    return sql;
+    return `ALTER TABLE ${tableId} ADD (${colId} ${type}${buildColumnNullAndDefaultSuffix(col, false)});`;
   }
 
   if (dialect === 'sqlserver') {
-    let type = col.type;
-    if (type.toUpperCase() === 'VARCHAR') type = 'NVARCHAR(100)';
-    let sql = `ALTER TABLE [dbo].[${safeTable}] ADD [${safeCol}] ${type}`;
-    if (!col.nullable) sql += ' NOT NULL';
-    else sql += ' NULL';
-    if (col.defaultValue) sql += ` DEFAULT ${col.defaultValue}`;
-    sql += ';';
-    return sql;
+    return `ALTER TABLE ${tableId} ADD ${colId} ${type}${buildColumnNullAndDefaultSuffix(col, true)};`;
   }
 
-  let sql = `ALTER TABLE \`${safeTable}\` ADD COLUMN \`${safeCol}\` ${col.type}`;
-  if (!col.nullable) {
-    sql += ' NOT NULL';
+  return `ALTER TABLE ${tableId} ADD COLUMN ${colId} ${type}${buildColumnNullAndDefaultSuffix(col, false)};`;
+}
+
+function mapDialectCreateColumnType(col: ColumnDefinition, dialect: DatabaseType): string {
+  const upperType = col.type.toUpperCase();
+  if (dialect === 'oracle') {
+    if (upperType.includes('AUTOINCREMENT') || (col.primaryKey && col.type === 'INTEGER')) {
+      return 'NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY';
+    }
+    if (upperType.startsWith('VARCHAR')) {
+      return col.type.replace(/VARCHAR/i, 'VARCHAR2');
+    }
+  } else if (dialect === 'sqlserver') {
+    if (col.primaryKey && upperType === 'INTEGER') {
+      return 'INT IDENTITY(1,1)';
+    }
+    if (upperType.startsWith('VARCHAR')) {
+      return col.type.replace(/VARCHAR/i, 'NVARCHAR');
+    }
   }
-  if (col.defaultValue !== undefined && col.defaultValue !== null && col.defaultValue !== '') {
-    sql += ` DEFAULT ${col.defaultValue}`;
-  }
-  return sql + ';';
+  return col.type;
 }
 
 export function generateRenameColumnSql(
@@ -100,19 +154,11 @@ export function generateRenameColumnSql(
   newColName: string,
   dialect: DatabaseType = 'sqlite'
 ): string {
-  const safeTable = tableName.replace(/[`"\[\]]/g, '');
-  const safeOld = oldColName.replace(/[`"\[\]]/g, '');
-  const safeNew = newColName.replace(/[`"\[\]]/g, '');
-
-  if (dialect === 'oracle') {
-    return `ALTER TABLE "${safeTable.toUpperCase()}" RENAME COLUMN "${safeOld.toUpperCase()}" TO "${safeNew.toUpperCase()}";`;
-  }
-
   if (dialect === 'sqlserver') {
-    return `EXEC sp_rename '[dbo].[${safeTable}].[${safeOld}]', '${safeNew}', 'COLUMN';`;
+    return `EXEC sp_rename '${qualifyTable(tableName, 'sqlserver')}.${quoteIdentifier(oldColName, 'sqlserver')}', '${cleanIdentifier(newColName)}', 'COLUMN';`;
   }
 
-  return `ALTER TABLE \`${safeTable}\` RENAME COLUMN \`${safeOld}\` TO \`${safeNew}\`;`;
+  return `ALTER TABLE ${qualifyTable(tableName, dialect)} RENAME COLUMN ${quoteIdentifier(oldColName, dialect)} TO ${quoteIdentifier(newColName, dialect)};`;
 }
 
 export function generateDropColumnSql(
@@ -120,18 +166,7 @@ export function generateDropColumnSql(
   colName: string,
   dialect: DatabaseType = 'sqlite'
 ): string {
-  const safeTable = tableName.replace(/[`"\[\]]/g, '');
-  const safeCol = colName.replace(/[`"\[\]]/g, '');
-
-  if (dialect === 'oracle') {
-    return `ALTER TABLE "${safeTable.toUpperCase()}" DROP COLUMN "${safeCol.toUpperCase()}";`;
-  }
-
-  if (dialect === 'sqlserver') {
-    return `ALTER TABLE [dbo].[${safeTable}] DROP COLUMN [${safeCol}];`;
-  }
-
-  return `ALTER TABLE \`${safeTable}\` DROP COLUMN \`${safeCol}\`;`;
+  return `ALTER TABLE ${qualifyTable(tableName, dialect)} DROP COLUMN ${quoteIdentifier(colName, dialect)};`;
 }
 
 export function generateCreateTableSql(
@@ -139,65 +174,10 @@ export function generateCreateTableSql(
   columns: ColumnDefinition[],
   dialect: DatabaseType = 'sqlite'
 ): string {
-  const cleanTable = tableName.replace(/[`"\[\]]/g, '');
-
-  if (dialect === 'oracle') {
-    const colDefs = columns.map((col) => {
-      let type = col.type;
-      if (type.toUpperCase().includes('AUTOINCREMENT') || (col.primaryKey && type === 'INTEGER')) {
-        type = 'NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY';
-      } else if (type.toUpperCase().startsWith('VARCHAR')) {
-        type = type.replace(/VARCHAR/i, 'VARCHAR2');
-      }
-      let def = `  "${col.name.replace(/[`"]/g, '').toUpperCase()}" ${type}`;
-      if (col.primaryKey) {
-        def += ' PRIMARY KEY';
-      } else if (!col.nullable) {
-        def += ' NOT NULL';
-      }
-      if (col.defaultValue) {
-        def += ` DEFAULT ${col.defaultValue}`;
-      }
-      return def;
-    });
-    return `CREATE TABLE "${cleanTable.toUpperCase()}" (\n${colDefs.join(',\n')}\n);`;
-  }
-
-  if (dialect === 'sqlserver') {
-    const colDefs = columns.map((col) => {
-      let type = col.type;
-      if (col.primaryKey && type.toUpperCase() === 'INTEGER') {
-        type = 'INT IDENTITY(1,1)';
-      } else if (type.toUpperCase().startsWith('VARCHAR')) {
-        type = type.replace(/VARCHAR/i, 'NVARCHAR');
-      }
-      let def = `  [${col.name.replace(/[\[\]]/g, '')}] ${type}`;
-      if (col.primaryKey) {
-        def += ' PRIMARY KEY';
-      } else if (!col.nullable) {
-        def += ' NOT NULL';
-      }
-      if (col.defaultValue) {
-        def += ` DEFAULT ${col.defaultValue}`;
-      }
-      return def;
-    });
-    return `CREATE TABLE [dbo].[${cleanTable}] (\n${colDefs.join(',\n')}\n);`;
-  }
-
-  const safeTable = cleanTable;
   const colDefs = columns.map((col) => {
-    let def = `  \`${col.name.replace(/`/g, '')}\` ${col.type}`;
-    if (col.primaryKey) {
-      def += ' PRIMARY KEY';
-    } else if (!col.nullable) {
-      def += ' NOT NULL';
-    }
-    if (col.defaultValue) {
-      def += ` DEFAULT ${col.defaultValue}`;
-    }
-    return def;
+    const type = mapDialectCreateColumnType(col, dialect);
+    return `  ${quoteIdentifier(col.name, dialect)} ${type}${appendColumnConstraints(col)}`;
   });
 
-  return `CREATE TABLE \`${safeTable}\` (\n${colDefs.join(',\n')}\n);`;
+  return `CREATE TABLE ${qualifyTable(tableName, dialect)} (\n${colDefs.join(',\n')}\n);`;
 }

@@ -1,25 +1,25 @@
 import React, { useState } from 'react';
-import { ColumnDefinition, TableDefinition } from '../../types/database';
-import { generateCreateTableSql } from '../../utils/tableManagement';
+import { ColumnDefinition, TableDefinition, DatabaseType } from '../../types/database';
+import { COMMON_COLUMN_TYPES, generateCreateTableSql } from '../../utils/tableManagement';
 import {
   X,
   Plus,
   Trash2,
   Table as TableIcon,
-  Code2,
   Check,
   AlertCircle,
-  Key,
 } from 'lucide-react';
 
 interface CreateTableModalProps {
   isOpen: boolean;
+  dialect?: DatabaseType;
   onClose: () => void;
   onCreateTable: (tableDef: TableDefinition, ddl: string) => Promise<void>;
 }
 
 export const CreateTableModal: React.FC<CreateTableModalProps> = ({
   isOpen,
+  dialect = 'sqlite',
   onClose,
   onCreateTable,
 }) => {
@@ -58,7 +58,7 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
   };
 
   const generatedDdl = tableName.trim()
-    ? generateCreateTableSql(tableName.trim(), columns)
+    ? generateCreateTableSql(tableName.trim(), columns, dialect)
     : '-- Enter a table name to preview CREATE TABLE DDL';
 
   const handleSubmit = async () => {
@@ -87,7 +87,7 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
       await onCreateTable(tableDef, generatedDdl);
       onClose();
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Failed to create table in WebAssembly engine.');
+      setErrorMessage(err?.message || 'Failed to create table.');
     } finally {
       setIsCreating(false);
     }
@@ -107,9 +107,9 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
           <div className="flex items-center gap-2">
             <TableIcon className="w-5 h-5 text-emerald-400" />
             <div>
-              <h3 className="font-bold text-white text-sm">Create New Table (Table Designer)</h3>
+              <h3 className="font-bold text-white text-sm">Create New Table</h3>
               <p className="text-[11px] text-[#858585]">
-                Design and provision a new table with column constraints in the WebAssembly database
+                Define columns and constraints for the new table
               </p>
             </div>
           </div>
@@ -185,13 +185,11 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
                           onChange={(e) => updateColumnField(idx, 'type', e.target.value)}
                           className="bg-[#111111] border border-[#3c3c3c] rounded px-2 py-0.5 text-emerald-400 font-mono text-xs outline-none"
                         >
-                          <option value="INTEGER">INTEGER</option>
-                          <option value="VARCHAR(100)">VARCHAR(100)</option>
-                          <option value="VARCHAR(255)">VARCHAR(255)</option>
-                          <option value="TEXT">TEXT</option>
-                          <option value="DECIMAL(10,2)">DECIMAL(10,2)</option>
-                          <option value="TIMESTAMP">TIMESTAMP</option>
-                          <option value="BOOLEAN">BOOLEAN</option>
+                          {COMMON_COLUMN_TYPES.map((typeOption) => (
+                            <option key={typeOption} value={typeOption}>
+                              {typeOption}
+                            </option>
+                          ))}
                         </select>
                       </td>
                       <td className="py-1.5 px-2 text-center">
@@ -246,7 +244,7 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
           {/* DDL Preview */}
           <div>
             <span className="block text-[#858585] mb-1 font-mono text-[11px]">
-              Generated DDL (WASM Execution Preview)
+              DDL Preview
             </span>
             <pre className="bg-[#111111] border border-[#333333] rounded p-3 text-sky-300 font-mono text-xs select-text leading-5 overflow-auto max-h-32">
               {generatedDdl}
@@ -255,10 +253,7 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 bg-[#2d2d2d] border-t border-[#3c3c3c]">
-          <span className="text-[11px] text-[#858585]">
-            Will be instantiated immediately in WASM memory space
-          </span>
+        <div className="flex items-center justify-end px-5 py-3 bg-[#2d2d2d] border-t border-[#3c3c3c]">
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}

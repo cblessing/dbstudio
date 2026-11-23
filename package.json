@@ -1,7 +1,7 @@
 {
   "name": "database-studio-vscode",
-  "displayName": "Database Studio (WebAssembly)",
-  "description": "High-performance WebAssembly database client for VS Code with universal database support (Oracle, SQL Server, Postgres, MySQL, DuckDB, SQLite), visual query runner, and editable data grid.",
+  "displayName": "Database Studio",
+  "description": "Universal database client for VS Code with support for Oracle, SQL Server, PostgreSQL, MySQL, DuckDB, and SQLite, visual query runner, ER diagrams, and editable data grid.",
   "version": "1.0.0",
   "publisher": "database-studio",
   "icon": "public/icon.png",
@@ -25,12 +25,13 @@
     "postgres",
     "mysql",
     "sqlite",
-    "duckdb",
-    "webassembly"
+    "duckdb"
   ],
   "main": "./out/extension.js",
   "activationEvents": [
     "onCommand:database-studio.open",
+    "onCommand:database-studio.newQuery",
+    "onCommand:database-studio.openErd",
     "onView:database-studio.sidebarView"
   ],
   "contributes": {
@@ -55,22 +56,45 @@
     "commands": [
       {
         "command": "database-studio.open",
-        "title": "Open Database Studio (Full View)",
+        "title": "Open Database Studio",
         "category": "Database Studio",
         "icon": "$(database)"
+      },
+      {
+        "command": "database-studio.newQuery",
+        "title": "New SQL Script",
+        "category": "Database Studio",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "database-studio.openErd",
+        "title": "Open ER Diagram",
+        "category": "Database Studio",
+        "icon": "$(type-hierarchy)"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "database-studio.open"
+        },
+        {
+          "command": "database-studio.newQuery"
+        },
+        {
+          "command": "database-studio.openErd"
         }
       ],
       "view/title": [
         {
-          "command": "database-studio.open",
+          "command": "database-studio.newQuery",
           "when": "view == database-studio.sidebarView",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "database-studio.openErd",
+          "when": "view == database-studio.sidebarView",
+          "group": "navigation@2"
         }
       ]
     }
@@ -79,11 +103,12 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build:client": "vite build",
-    "build:extension": "tsc -p tsconfig.extension.json",
-    "build": "vite build && tsc -p tsconfig.extension.json",
+    "build:extension": "tsc -p tsconfig.extension.json && node -e \"fs.writeFileSync('out/package.json', JSON.stringify({ type: 'commonjs' }, null, 2))\"",
+    "build": "vite build && npm run build:extension",
     "preview": "vite preview",
     "clean": "node -e \"['dist', 'out'].forEach(d => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) {} })\"",
     "lint": "tsc --noEmit",
+    "test": "tsx --test src/utils/erDiagramLayout.test.ts src/utils/exportData.test.ts src/utils/sqlCompletion.test.ts src/utils/sqlFormatter.test.ts src/utils/tableManagement.test.ts src/engine/sqlEngineCore.test.ts src/engine/databaseManager.test.ts",
     "package:extension": "npm run build && npx @vscode/vsce package --no-dependencies --allow-missing-repository",
     "publish:extension": "npm run build && npx @vscode/vsce publish"
   },

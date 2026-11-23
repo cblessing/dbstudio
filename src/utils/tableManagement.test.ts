@@ -15,7 +15,7 @@ test('generateDropTableSql outputs valid DROP TABLE statement', () => {
   assert.equal(sql, 'DROP TABLE IF EXISTS `customers`;');
 });
 
-test('generateTruncateTableSql outputs valid DELETE statement for WASM SQLite', () => {
+test('generateTruncateTableSql outputs valid DELETE statement for SQLite', () => {
   const sql = generateTruncateTableSql('orders');
   assert.equal(sql, 'DELETE FROM `orders`;');
 });

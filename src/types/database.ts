@@ -23,7 +23,6 @@ export interface DatabaseDriverInfo {
   icon: string;
   color: string;
   description: string;
-  wasmSupported: boolean;
   sampleDbAvailable: boolean;
 }
 
@@ -54,10 +53,25 @@ export interface TableDefinition {
   ddl?: string;
 }
 
+export interface ViewDefinition {
+  name: string;
+  schema?: string;
+  columns?: ColumnDefinition[];
+  definition: string;
+}
+
+export interface ProcedureDefinition {
+  name: string;
+  schema?: string;
+  parameters?: string;
+  definition: string;
+}
+
 export interface SchemaDefinition {
   name: string;
   tables: TableDefinition[];
-  views?: { name: string; definition: string }[];
+  views?: ViewDefinition[];
+  procedures?: ProcedureDefinition[];
 }
 
 export interface DatabaseConnection {
@@ -72,7 +86,6 @@ export interface DatabaseConnection {
   ssl: boolean;
   colorBadge: string;
   status: 'connected' | 'disconnected' | 'connecting';
-  isWasmNative: boolean;
   schemas: SchemaDefinition[];
   pingMs?: number;
   version?: string;
@@ -89,6 +102,8 @@ export interface QueryResult {
   query: string;
   error?: string;
   explainPlan?: ExecutionPlanStep[];
+  hasMore?: boolean;
+  nextOffset?: number;
 }
 
 export interface ExecutionPlanStep {

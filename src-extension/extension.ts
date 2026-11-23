@@ -2,111 +2,202 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
+interface EditorTabConfig {
+  editorType: 'query' | 'erd' | 'table';
+  connectionId?: string;
+  tableName?: string;
+  title?: string;
+  initialQuery?: string;
+}
+
+class ExtensionStateStore {
+  public connections: any[] | undefined = undefined;
+  public ddlHistory: string[] = [];
+  public queryCounter = 0;
+  private webviews = new Set<vscode.Webview>();
+  private reusablePanels = new Map<string, vscode.WebviewPanel>();
+
+  public registerWebview(webview: vscode.Webview, disposables?: vscode.Disposable[]) {
+    this.webviews.add(webview);
+    if (disposables) {
+      disposables.push({
+        dispose: () => {
+          this.webviews.delete(webview);
+        },
+      });
+    }
+  }
+
+  public unregisterWebview(webview: vscode.Webview) {
+    this.webviews.delete(webview);
+  }
+
+  public broadcastState(sender: vscode.Webview, connections?: any[], ddlQuery?: string) {
+    if (connections) {
+      this.connections = connections;
+    }
+    if (ddlQuery) {
+      this.ddlHistory.push(ddlQuery);
+    }
+
+    for (const wv of this.webviews) {
+      if (wv !== sender) {
+        wv.postMessage({
+          command: 'syncState',
+          connections: this.connections,
+          ddlQuery,
+        });
+      }
+    }
+  }
+
+  public getReusablePanel(key: string): vscode.WebviewPanel | undefined {
+    return this.reusablePanels.get(key);
+  }
+
+  public setReusablePanel(key: string, panel: vscode.WebviewPanel) {
+    this.reusablePanels.set(key, panel);
+  }
+
+  public deleteReusablePanel(key: string) {
+    this.reusablePanels.delete(key);
+  }
+}
+
+const stateStore = new ExtensionStateStore();
+
 export function activate(context: vscode.ExtensionContext) {
-  // Register Command: Database Studio: Open Database Studio
   const openDisposable = vscode.commands.registerCommand(
     'database-studio.open',
     () => {
-      DatabaseStudioPanel.createOrShow(context.extensionUri);
+      openEditorTab(context.extensionUri, { editorType: 'query' });
     }
   );
 
-  // Register Activity Bar Webview View Provider (if docked in sidebar)
+  const newQueryDisposable = vscode.commands.registerCommand(
+    'database-studio.newQuery',
+    () => {
+      openEditorTab(context.extensionUri, { editorType: 'query' });
+    }
+  );
+
+  const openErdDisposable = vscode.commands.registerCommand(
+    'database-studio.openErd',
+    () => {
+      openEditorTab(context.extensionUri, {
+        editorType: 'erd',
+        title: 'schema.erd',
+      });
+    }
+  );
+
   const sidebarProvider = new DatabaseStudioSidebarProvider(context.extensionUri);
   const viewDisposable = vscode.window.registerWebviewViewProvider(
     'database-studio.sidebarView',
     sidebarProvider,
     {
-      webviewOptions: {
-        retainContextWhenHidden: true,
-      },
+      webviewOptions: { retainContextWhenHidden: true },
     }
   );
 
-  context.subscriptions.push(openDisposable, viewDisposable);
+  context.subscriptions.push(
+    openDisposable,
+    newQueryDisposable,
+    openErdDisposable,
+    viewDisposable
+  );
 }
 
 export function deactivate() {}
 
-class DatabaseStudioPanel {
-  public static currentPanel: DatabaseStudioPanel | undefined;
-  public static readonly viewType = 'database-studio.panel';
+function resolveReuseKey(config: EditorTabConfig, connId: string): string | undefined {
+  if (config.editorType === 'table') {
+    const tableName = config.tableName ? config.tableName : 'customers';
+    return `table:${connId}:${tableName}`;
+  }
+  if (config.editorType === 'erd') {
+    return `erd:${connId}`;
+  }
+  return undefined;
+}
 
-  private readonly _panel: vscode.WebviewPanel;
-  private readonly _extensionUri: vscode.Uri;
-  private _disposables: vscode.Disposable[] = [];
+function resolveTabTitle(config: EditorTabConfig): string {
+  if (config.title) return config.title;
+  if (config.editorType === 'table') {
+    const tableName = config.tableName ? config.tableName : 'table';
+    return `${tableName}.table`;
+  }
+  if (config.editorType === 'erd') {
+    return 'schema.erd';
+  }
+  stateStore.queryCounter += 1;
+  return `Script-${stateStore.queryCounter}.sql`;
+}
 
-  public static createOrShow(extensionUri: vscode.Uri) {
-    const column = vscode.window.activeTextEditor
-      ? vscode.window.activeTextEditor.viewColumn
-      : undefined;
+function attachPanelDisposeListener(
+  panel: vscode.WebviewPanel,
+  reuseKey: string | undefined,
+  disposables: vscode.Disposable[]
+): void {
+  panel.onDidDispose(
+    () => {
+      if (reuseKey) {
+        stateStore.deleteReusablePanel(reuseKey);
+      }
+      stateStore.unregisterWebview(panel.webview);
+      while (disposables.length) {
+        const d = disposables.pop();
+        if (d) d.dispose();
+      }
+    },
+    null,
+    disposables
+  );
+}
 
-    // If panel already exists, reveal it
-    if (DatabaseStudioPanel.currentPanel) {
-      DatabaseStudioPanel.currentPanel._panel.reveal(column);
+function openEditorTab(extensionUri: vscode.Uri, config: EditorTabConfig) {
+  const activeEditor = vscode.window.activeTextEditor;
+  const column = activeEditor ? activeEditor.viewColumn : vscode.ViewColumn.One;
+  const connId = config.connectionId ? config.connectionId : 'conn_sqlite_local';
+  const reuseKey = resolveReuseKey(config, connId);
+
+  if (reuseKey) {
+    const existingPanel = stateStore.getReusablePanel(reuseKey);
+    if (existingPanel) {
+      existingPanel.reveal(column);
       return;
     }
-
-    // Otherwise, create a new panel
-    const panel = vscode.window.createWebviewPanel(
-      DatabaseStudioPanel.viewType,
-      'Database Studio (WebAssembly)',
-      column || vscode.ViewColumn.One,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.joinPath(extensionUri, 'dist'),
-          vscode.Uri.joinPath(extensionUri, 'public'),
-        ],
-      }
-    );
-
-    DatabaseStudioPanel.currentPanel = new DatabaseStudioPanel(panel, extensionUri);
   }
 
-  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-    this._panel = panel;
-    this._extensionUri = extensionUri;
-
-    // Set the webview's initial html content
-    this._update();
-
-    // Listen for when the panel is disposed
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-
-    // Handle messages sent from the Webview (React App)
-    this._panel.webview.onDidReceiveMessage(
-      (message: any) => {
-        switch (message.command) {
-          case 'alert':
-            vscode.window.showInformationMessage(message.text);
-            return;
-          case 'error':
-            vscode.window.showErrorMessage(message.text);
-            return;
-        }
-      },
-      null,
-      this._disposables
-    );
-  }
-
-  public dispose() {
-    DatabaseStudioPanel.currentPanel = undefined;
-    this._panel.dispose();
-
-    while (this._disposables.length) {
-      const x = this._disposables.pop();
-      if (x) {
-        x.dispose();
-      }
+  const tabTitle = resolveTabTitle(config);
+  const panel = vscode.window.createWebviewPanel(
+    `database-studio.${config.editorType}`,
+    tabTitle,
+    column ? column : vscode.ViewColumn.One,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(extensionUri, 'dist'),
+        vscode.Uri.joinPath(extensionUri, 'public'),
+      ],
     }
+  );
+
+  const disposables: vscode.Disposable[] = [];
+  stateStore.registerWebview(panel.webview, disposables);
+  if (reuseKey) {
+    stateStore.setReusablePanel(reuseKey, panel);
   }
 
-  private _update() {
-    this._panel.webview.html = getWebviewHtml(this._panel.webview, this._extensionUri);
-  }
+  registerWebviewMessageHandler(panel.webview, extensionUri, disposables);
+  panel.webview.html = getWebviewHtml(panel.webview, extensionUri, 'editor', {
+    ...config,
+    connectionId: connId,
+    title: tabTitle,
+  });
+
+  attachPanelDisposeListener(panel, reuseKey, disposables);
 }
 
 class DatabaseStudioSidebarProvider implements vscode.WebviewViewProvider {
@@ -125,27 +216,132 @@ class DatabaseStudioSidebarProvider implements vscode.WebviewViewProvider {
       ],
     };
 
-    webviewView.webview.html = getWebviewHtml(webviewView.webview, this._extensionUri);
+    stateStore.registerWebview(webviewView.webview);
+    registerWebviewMessageHandler(webviewView.webview, this._extensionUri);
+    webviewView.webview.html = getWebviewHtml(
+      webviewView.webview,
+      this._extensionUri,
+      'sidebar'
+    );
+
+    webviewView.onDidDispose(() => {
+      stateStore.unregisterWebview(webviewView.webview);
+    });
   }
 }
 
-function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+async function handleSaveFileMessage(message: any): Promise<void> {
+  const defaultFilename = message.filename ? message.filename : 'export.txt';
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+  const defaultUri = workspaceFolder
+    ? vscode.Uri.joinPath(workspaceFolder, defaultFilename)
+    : vscode.Uri.file(defaultFilename);
+
+  const saveUri = await vscode.window.showSaveDialog({
+    defaultUri,
+    saveLabel: 'Export File',
+  });
+
+  if (!saveUri) return;
+
+  try {
+    const buffer = message.isBase64
+      ? Buffer.from(message.content, 'base64')
+      : Buffer.from(String(message.content ?? ''), 'utf8');
+    fs.writeFileSync(saveUri.fsPath, buffer);
+    vscode.window.showInformationMessage(`Saved export to ${saveUri.fsPath}`);
+  } catch (err: any) {
+    const errText = err ? String(err.message || err) : 'Unknown error';
+    vscode.window.showErrorMessage(`Failed to save file: ${errText}`);
+  }
+}
+
+function registerWebviewMessageHandler(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  disposables?: vscode.Disposable[]
+) {
+  webview.onDidReceiveMessage(
+    async (message: any) => {
+      switch (message.command) {
+        case 'alert':
+          vscode.window.showInformationMessage(message.text);
+          return;
+        case 'error':
+          vscode.window.showErrorMessage(message.text);
+          return;
+        case 'openFullView':
+          vscode.commands.executeCommand('database-studio.open');
+          return;
+        case 'openEditor':
+          openEditorTab(extensionUri, {
+            editorType: message.editorType ? message.editorType : 'query',
+            connectionId: message.connectionId,
+            tableName: message.tableName,
+            title: message.title,
+            initialQuery: message.initialQuery,
+          });
+          return;
+        case 'stateUpdate':
+          stateStore.broadcastState(webview, message.connections, message.ddlQuery);
+          return;
+        case 'saveFile':
+          await handleSaveFileMessage(message);
+          return;
+      }
+    },
+    null,
+    disposables
+  );
+}
+
+function buildBootstrapScriptContent(
+  viewMode: 'sidebar' | 'editor',
+  editorConfig?: EditorTabConfig
+): string {
+  const lines: string[] = [
+    `window.__VSCODE_VIEW_MODE__ = ${JSON.stringify(viewMode)};`,
+  ];
+  if (editorConfig) {
+    lines.push(`window.__VSCODE_EDITOR_CONFIG__ = ${JSON.stringify(editorConfig)};`);
+  }
+  if (stateStore.connections) {
+    lines.push(`window.__VSCODE_INITIAL_CONNECTIONS__ = ${JSON.stringify(stateStore.connections)};`);
+  }
+  if (stateStore.ddlHistory.length > 0) {
+    lines.push(`window.__VSCODE_DDL_HISTORY__ = ${JSON.stringify(stateStore.ddlHistory)};`);
+  }
+  return lines.join('\n      ');
+}
+
+function getWebviewHtml(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  viewMode: 'sidebar' | 'editor' = 'editor',
+  editorConfig?: EditorTabConfig
+): string {
   const distPath = path.join(extensionUri.fsPath, 'dist');
   const indexPath = path.join(distPath, 'index.html');
 
   if (fs.existsSync(indexPath)) {
     let html = fs.readFileSync(indexPath, 'utf8');
+    const distUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist'));
 
-    // Replace relative paths with Webview URIs
-    html = html.replace(/(href|src)="\/?([^"]+)"/g, (_match, attr, relPath) => {
-      const resourceUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', relPath));
-      return `${attr}="${resourceUri}"`;
-    });
+    html = html.replace(
+      /(href|src)="(?!https?:\/\/|data:|vscode-|#)\/?(?:\.\/)?([^"]+)"/g,
+      (_match, attr, relPath) => {
+        const resourceUri = webview.asWebviewUri(
+          vscode.Uri.joinPath(extensionUri, 'dist', relPath)
+        );
+        return `${attr}="${resourceUri}"`;
+      }
+    );
 
-    return html;
+    const bootstrapScripts = buildBootstrapScriptContent(viewMode, editorConfig);
+    const headInjection = `<head>\n    <base href="${distUri}/" />\n    <script>\n      ${bootstrapScripts}\n    </script>`;
+    return html.replace('<head>', headInjection);
   }
 
-  // Fallback if not yet built
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

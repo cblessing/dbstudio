@@ -87,30 +87,8 @@ export function formatSql(query: string): string {
     tokenized = tokenized.replace(regex, kw);
   }
 
-  // Break lines before main clauses using safe negative lookbehinds
-  // Ensure we don't break 'INNER JOIN' into 'INNER \nJOIN'
-  const clauseKeywords = [
-    'SELECT',
-    'FROM',
-    'WHERE',
-    'GROUP BY',
-    'HAVING',
-    'ORDER BY',
-    'LIMIT',
-    'OFFSET',
-    'INNER JOIN',
-    'LEFT JOIN',
-    'RIGHT JOIN',
-    'CROSS JOIN',
-    'FULL JOIN',
-    'JOIN',
-    'VALUES',
-    'SET',
-    'UNION ALL',
-    'UNION',
-  ];
-
-  // Protect multi-word join phrases first
+  // Break lines before main clauses
+  // Protect multi-word join phrases first so we don't break 'INNER JOIN' into 'INNER \nJOIN'
   tokenized = tokenized.replace(/\b(INNER|LEFT|RIGHT|CROSS|FULL)\s+JOIN\b/g, '__MWJOIN_$1__');
   // Break standalone JOIN
   tokenized = tokenized.replace(/\bJOIN\b/g, '\n  JOIN');

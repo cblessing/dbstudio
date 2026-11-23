@@ -1,10 +1,10 @@
 # Database Studio (VS Code Extension)
 
-> High-performance WebAssembly database client for Visual Studio Code with universal SQL engine support, visual table designer, and interactive query runner.
+> Universal database client for Visual Studio Code with multi-dialect SQL support, visual table designer, interactive ER diagrams, and query runner.
 
 ## Features
 
-- **⚡ Zero-Latency WebAssembly Engine**: Runs embedded 32-bit `sql.js` (SQLite WASM) locally with zero external network dependencies.
+- **⚡ Embedded Local SQL Engine**: Runs an embedded local SQLite engine out of the box with zero external dependencies required.
 - **🌐 Universal Database Dialect Support**:
   - **Oracle Database** (`VARCHAR2`, `IDENTITY`, `ROWNUM`, `SYSDATE`, `DUAL`, `CASCADE CONSTRAINTS`)
   - **Microsoft SQL Server (T-SQL)** (`NVARCHAR`, `IDENTITY(1,1)`, `TOP N`, `@@VERSION`, `@@SERVERNAME`, brackets `[table]`)

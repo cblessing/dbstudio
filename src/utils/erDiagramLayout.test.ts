@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { computeInitialERDLayout, calculateBezierPath } from './erDiagramLayout';
-import { INITIAL_ECOMMERCE_TABLES } from '../wasm/sqlEngineCore';
+import { INITIAL_ECOMMERCE_TABLES } from '../engine/sqlEngineCore';
 
 test('computeInitialERDLayout creates nodes and edges from tables', () => {
   const { nodes, edges } = computeInitialERDLayout(INITIAL_ECOMMERCE_TABLES);
