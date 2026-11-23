@@ -11,7 +11,7 @@ export const COMMON_COLUMN_TYPES = [
 ] as const;
 
 function cleanIdentifier(name: string): string {
-  return name.replace(/[`"\[\]]/g, '');
+  return name.replace(/[`"[\]]/g, '');
 }
 
 function quoteIdentifier(name: string, dialect: DatabaseType): string {

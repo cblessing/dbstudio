@@ -259,6 +259,67 @@ function ResultsMessagesPanel({
   );
 }
 
+function ResultsTabHeader({
+  activeBottomTab,
+  onSelectTab,
+  result,
+}: {
+  activeBottomTab: 'grid' | 'explain' | 'messages';
+  onSelectTab: (tab: 'grid' | 'explain' | 'messages') => void;
+  result: QueryResult | null;
+}) {
+  const hasSuccessResult = Boolean(result) && !result?.error;
+  const tabClass = (tab: 'grid' | 'explain' | 'messages') =>
+    `px-3 py-1.5 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
+      activeBottomTab === tab
+        ? 'border-[#007acc] text-white bg-[#1e1e1e]'
+        : 'border-transparent text-[#858585] hover:text-[#cccccc]'
+    }`;
+
+  return (
+    <div className="flex items-center justify-between border-b border-[#2d2d2d] bg-[#252526] px-2">
+      <div className="flex items-center">
+        <button onClick={() => onSelectTab('grid')} className={tabClass('grid')}>
+          <span>Results</span>
+          {hasSuccessResult && (
+            <span className="bg-[#333333] text-[#cccccc] text-[10px] px-1.5 py-0.2 rounded-full">
+              {result!.rowCount}
+              {result!.hasMore ? '+' : ''}
+            </span>
+          )}
+        </button>
+
+        <button onClick={() => onSelectTab('explain')} className={tabClass('explain')}>
+          <GitCommit className="w-3.5 h-3.5 text-purple-400" />
+          <span>Explain</span>
+        </button>
+
+        <button onClick={() => onSelectTab('messages')} className={tabClass('messages')}>
+          {result?.error ? (
+            <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+          ) : (
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          )}
+          <span>Messages</span>
+        </button>
+      </div>
+
+      {hasSuccessResult && (
+        <div className="text-[11px] text-[#858585] flex items-center gap-2 pr-2">
+          <Clock className="w-3 h-3 text-sky-400" />
+          <span>
+            Execution: <span className="text-white font-mono">{result!.executionTimeMs}ms</span>
+          </span>
+          <span>•</span>
+          <span>
+            Fetch: <span className="text-white font-mono">{result!.fetchTimeMs}ms</span>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ResultsBottomPanel({
   activeBottomTab,
   onSelectTab,
@@ -276,8 +337,6 @@ export function ResultsBottomPanel({
   connectionName: string;
   databaseName: string;
 }) {
-  const hasSuccessResult = Boolean(result) && !result?.error;
-
   const renderGridTab = () => {
     if (!result) {
       return (
@@ -312,67 +371,11 @@ export function ResultsBottomPanel({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#1e1e1e]">
-      <div className="flex items-center justify-between border-b border-[#2d2d2d] bg-[#252526] px-2">
-        <div className="flex items-center">
-          <button
-            onClick={() => onSelectTab('grid')}
-            className={`px-3 py-1.5 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
-              activeBottomTab === 'grid'
-                ? 'border-[#007acc] text-white bg-[#1e1e1e]'
-                : 'border-transparent text-[#858585] hover:text-[#cccccc]'
-            }`}
-          >
-            <span>Results</span>
-            {hasSuccessResult && (
-              <span className="bg-[#333333] text-[#cccccc] text-[10px] px-1.5 py-0.2 rounded-full">
-                {result!.rowCount}
-                {result!.hasMore ? '+' : ''}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => onSelectTab('explain')}
-            className={`px-3 py-1.5 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
-              activeBottomTab === 'explain'
-                ? 'border-[#007acc] text-white bg-[#1e1e1e]'
-                : 'border-transparent text-[#858585] hover:text-[#cccccc]'
-            }`}
-          >
-            <GitCommit className="w-3.5 h-3.5 text-purple-400" />
-            <span>Explain</span>
-          </button>
-
-          <button
-            onClick={() => onSelectTab('messages')}
-            className={`px-3 py-1.5 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
-              activeBottomTab === 'messages'
-                ? 'border-[#007acc] text-white bg-[#1e1e1e]'
-                : 'border-transparent text-[#858585] hover:text-[#cccccc]'
-            }`}
-          >
-            {result?.error ? (
-              <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            )}
-            <span>Messages</span>
-          </button>
-        </div>
-
-        {hasSuccessResult && (
-          <div className="text-[11px] text-[#858585] flex items-center gap-2 pr-2">
-            <Clock className="w-3 h-3 text-sky-400" />
-            <span>
-              Execution: <span className="text-white font-mono">{result!.executionTimeMs}ms</span>
-            </span>
-            <span>•</span>
-            <span>
-              Fetch: <span className="text-white font-mono">{result!.fetchTimeMs}ms</span>
-            </span>
-          </div>
-        )}
-      </div>
+      <ResultsTabHeader
+        activeBottomTab={activeBottomTab}
+        onSelectTab={onSelectTab}
+        result={result}
+      />
 
       <div className="flex-1 min-h-0 relative">
         {activeBottomTab === 'grid' && renderGridTab()}

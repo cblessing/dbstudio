@@ -1,5 +1,6 @@
 .playwright-cli/**
 .vscode/**
+.github/**
 .aistudio/**
 vite-project/**
 node_modules/**
@@ -18,3 +19,5 @@ index.html
 *.log
 .env*
 bun.lock
+AGENTS.md
+eslint.config.js

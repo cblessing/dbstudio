@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search } from 'lucide-react';
 
 export interface CommandItem {
@@ -23,13 +23,15 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
-  useEffect(() => {
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setSearch('');
       setSelectedIndex(0);
     }
-  }, [isOpen]);
+  }
 
   if (!isOpen) return null;
 

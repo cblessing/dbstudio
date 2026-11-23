@@ -192,8 +192,19 @@ export const TableDetailsView: React.FC<TableDetailsViewProps> = ({
   };
 
   useEffect(() => {
-    loadData();
-  }, [table.name]);
+    let active = true;
+    (async () => {
+      try {
+        const res = await onFetchTableData(table.name, 0);
+        if (active) setGridData(res);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [table.name, onFetchTableData]);
 
   const copyDdl = () => {
     if (table.ddl) {

@@ -126,8 +126,9 @@ export const ERDiagramViewer: React.FC<ERDiagramViewerProps> = ({
   tables,
   onSelectTable,
 }) => {
-  const [nodes, setNodes] = useState<ERDNode[]>([]);
-  const [edges, setEdges] = useState<ERDEdge[]>([]);
+  const [prevTables, setPrevTables] = useState<TableDefinition[]>(tables);
+  const [nodes, setNodes] = useState<ERDNode[]>(() => computeInitialERDLayout(tables).nodes);
+  const [edges, setEdges] = useState<ERDEdge[]>(() => computeInitialERDLayout(tables).edges);
   const [zoom, setZoom] = useState(1);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
@@ -136,11 +137,12 @@ export const ERDiagramViewer: React.FC<ERDiagramViewerProps> = ({
   const panStartRef = useRef({ clientX: 0, clientY: 0, scrollLeft: 0, scrollTop: 0 });
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  if (tables !== prevTables) {
+    setPrevTables(tables);
     const layout = computeInitialERDLayout(tables);
     setNodes(layout.nodes);
     setEdges(layout.edges);
-  }, [tables]);
+  }
 
   const canvasWidth = Math.max(1400, ...nodes.map((n) => n.x + n.width + 240));
   const canvasHeight = Math.max(900, ...nodes.map((n) => n.y + n.height + 240));

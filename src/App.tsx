@@ -45,6 +45,9 @@ import {
   buildDestructiveConfirmConfig,
 } from './hooks/useVsCodeHostSync';
 
+let nextTabId = 2;
+const createTabId = (prefix: string) => `${prefix}_${nextTabId++}`;
+
 export default function App() {
   const viewMode = getInjectedGlobal<VsCodeViewMode>('__VSCODE_VIEW_MODE__') || 'standalone';
   const initialEditorConfig = getInjectedGlobal<VsCodeEditorConfig>('__VSCODE_EDITOR_CONFIG__');
@@ -114,7 +117,7 @@ export default function App() {
       return;
     }
     const queryNumber = tabs.filter((t) => t.type === 'query').length + 1;
-    const newTabId = `tab_sql_${Date.now()}`;
+    const newTabId = createTabId('tab_sql');
     setTabs((prev) => [
       ...prev,
       { id: newTabId, title: `Script-${queryNumber}.sql`, type: 'query', connectionId, queryContent: initialQuery ?? '' },
@@ -132,7 +135,7 @@ export default function App() {
       setActiveTabId(existing.id);
       return;
     }
-    const newTabId = `tab_tbl_${tableName}_${Date.now()}`;
+    const newTabId = createTabId(`tab_tbl_${tableName}`);
     setTabs((prev) => [...prev, { id: newTabId, title: `${tableName}.table`, type: 'table', connectionId, tableName }]);
     setActiveTabId(newTabId);
   };
@@ -149,7 +152,7 @@ export default function App() {
       setActiveTabId(existing.id);
       return;
     }
-    const newTabId = `tab_erd_${Date.now()}`;
+    const newTabId = createTabId('tab_erd');
     setTabs((prev) => [...prev, { id: newTabId, title, type: 'erd', connectionId }]);
     setActiveTabId(newTabId);
   };

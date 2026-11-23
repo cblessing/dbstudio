@@ -287,7 +287,7 @@ export function getSqlCompletions(
   )!;
 
   const rawQualifier = tokenMatch[1]
-    ? tokenMatch[1].replace(/^[\["`]|[\]"`]$/g, '')
+    ? tokenMatch[1].replace(/^[["`]|[\]"`]$/g, '')
     : undefined;
   const prefix = tokenMatch[2];
   const hasTriggerInput = Boolean(prefix) || Boolean(rawQualifier) || forceTrigger;

@@ -349,7 +349,7 @@ export function generateExecutionPlan(query: string): ExecutionPlanStep[] {
 
   if (q.includes('ORDER BY')) {
     steps.push({
-      id: stepId++,
+      id: stepId,
       operation: 'SORT (B-TREE / QUICKSORT)',
       cost: '12.0..18.0',
       rowsEstimate: 10,

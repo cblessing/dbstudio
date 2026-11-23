@@ -6,6 +6,19 @@ interface ExplainPlanViewProps {
   steps: ExecutionPlanStep[];
 }
 
+function getStepCardClass(operation: string): string {
+  if (operation.includes('JOIN')) return 'bg-purple-950/20 border-purple-800/40 text-purple-200';
+  if (operation.includes('INDEX')) return 'bg-emerald-950/20 border-emerald-800/40 text-emerald-200';
+  if (operation.includes('SCAN')) return 'bg-blue-950/20 border-blue-800/40 text-blue-200';
+  return 'bg-[#252526] border-[#3c3c3c] text-[#cccccc]';
+}
+
+function getStepIcon(operation: string): React.ReactNode {
+  if (operation.includes('JOIN')) return <GitCommit className="w-4 h-4 text-purple-400" />;
+  if (operation.includes('INDEX')) return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+  return <Layers className="w-4 h-4 text-blue-400" />;
+}
+
 export const ExplainPlanView: React.FC<ExplainPlanViewProps> = ({ steps }) => {
   if (!steps || steps.length === 0) {
     return (
@@ -16,69 +29,47 @@ export const ExplainPlanView: React.FC<ExplainPlanViewProps> = ({ steps }) => {
     );
   }
 
-  const renderStep = (step: ExecutionPlanStep, depth = 0) => {
-    const isJoin = step.operation.includes('JOIN');
-    const isIndex = step.operation.includes('INDEX');
-    const isScan = step.operation.includes('SCAN');
+  const renderStep = (step: ExecutionPlanStep, depth = 0) => (
+    <div key={step.id} className="flex flex-col gap-1">
+      <div
+        className={`flex items-start gap-2.5 p-2.5 rounded-lg border transition-all ${getStepCardClass(step.operation)}`}
+        style={{ marginLeft: `${depth * 24}px` }}
+      >
+        <div className="mt-0.5">{getStepIcon(step.operation)}</div>
 
-    return (
-      <div key={step.id} className="flex flex-col gap-1">
-        <div
-          className={`flex items-start gap-2.5 p-2.5 rounded-lg border transition-all ${
-            isJoin
-              ? 'bg-purple-950/20 border-purple-800/40 text-purple-200'
-              : isIndex
-              ? 'bg-emerald-950/20 border-emerald-800/40 text-emerald-200'
-              : isScan
-              ? 'bg-blue-950/20 border-blue-800/40 text-blue-200'
-              : 'bg-[#252526] border-[#3c3c3c] text-[#cccccc]'
-          }`}
-          style={{ marginLeft: `${depth * 24}px` }}
-        >
-          <div className="mt-0.5">
-            {isJoin ? (
-              <GitCommit className="w-4 h-4 text-purple-400" />
-            ) : isIndex ? (
-              <CheckCircle className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <Layers className="w-4 h-4 text-blue-400" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-bold text-white tracking-wide">{step.operation}</span>
+            {step.cost && (
+              <span className="text-[10px] bg-black/40 text-[#858585] px-1.5 py-0.5 rounded font-mono">
+                cost={step.cost}
+              </span>
             )}
           </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-bold text-white tracking-wide">{step.operation}</span>
-              {step.cost && (
-                <span className="text-[10px] bg-black/40 text-[#858585] px-1.5 py-0.5 rounded font-mono">
-                  cost={step.cost}
-                </span>
-              )}
+          {step.target && (
+            <p className="text-[11px] font-medium text-sky-300 mt-0.5">
+              Target: {step.target}
+            </p>
+          )}
+
+          <p className="text-[11px] text-[#a0a0a0] mt-0.5 font-mono">{step.details}</p>
+
+          {step.rowsEstimate !== undefined && (
+            <div className="text-[10px] text-zinc-500 mt-1">
+              Estimated Rows: <span className="text-zinc-300">{step.rowsEstimate}</span>
             </div>
-
-            {step.target && (
-              <p className="text-[11px] font-medium text-sky-300 mt-0.5">
-                Target: {step.target}
-              </p>
-            )}
-
-            <p className="text-[11px] text-[#a0a0a0] mt-0.5 font-mono">{step.details}</p>
-
-            {step.rowsEstimate !== undefined && (
-              <div className="text-[10px] text-zinc-500 mt-1">
-                Estimated Rows: <span className="text-zinc-300">{step.rowsEstimate}</span>
-              </div>
-            )}
-          </div>
+          )}
         </div>
-
-        {step.children && step.children.length > 0 && (
-          <div className="flex flex-col gap-1 relative before:absolute before:left-3 before:top-0 before:bottom-3 before:w-px before:bg-[#333333]">
-            {step.children.map((child) => renderStep(child, depth + 1))}
-          </div>
-        )}
       </div>
-    );
-  };
+
+      {step.children && step.children.length > 0 && (
+        <div className="flex flex-col gap-1 relative before:absolute before:left-3 before:top-0 before:bottom-3 before:w-px before:bg-[#333333]">
+          {step.children.map((child) => renderStep(child, depth + 1))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="p-4 overflow-y-auto h-full bg-[#181818] text-xs font-sans space-y-4">

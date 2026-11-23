@@ -230,6 +230,13 @@ class DatabaseStudioSidebarProvider implements vscode.WebviewViewProvider {
   }
 }
 
+function writeExportPayload(savePath: string, message: any): void {
+  const buffer = message.isBase64
+    ? Buffer.from(message.content, 'base64')
+    : Buffer.from(String(message.content ?? ''), 'utf8');
+  fs.writeFileSync(savePath, buffer);
+}
+
 async function handleSaveFileMessage(message: any): Promise<void> {
   const defaultFilename = message.filename ? message.filename : 'export.txt';
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
@@ -241,17 +248,13 @@ async function handleSaveFileMessage(message: any): Promise<void> {
     defaultUri,
     saveLabel: 'Export File',
   });
-
   if (!saveUri) return;
 
   try {
-    const buffer = message.isBase64
-      ? Buffer.from(message.content, 'base64')
-      : Buffer.from(String(message.content ?? ''), 'utf8');
-    fs.writeFileSync(saveUri.fsPath, buffer);
+    writeExportPayload(saveUri.fsPath, message);
     vscode.window.showInformationMessage(`Saved export to ${saveUri.fsPath}`);
   } catch (err: any) {
-    const errText = err ? String(err.message || err) : 'Unknown error';
+    const errText = err instanceof Error ? err.message : String(err);
     vscode.window.showErrorMessage(`Failed to save file: ${errText}`);
   }
 }

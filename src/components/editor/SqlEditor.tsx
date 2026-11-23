@@ -53,7 +53,13 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
   connectionId,
   onSelectConnection,
 }) => {
+  const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
+
+  if (initialQuery !== prevInitialQuery) {
+    setPrevInitialQuery(initialQuery);
+    setQuery(initialQuery);
+  }
   const [selectedText, setSelectedText] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<QueryResult | null>(null);
@@ -217,11 +223,35 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
   }, [isDraggingSplitter]);
 
   useEffect(() => {
-    setQuery(initialQuery);
-    if (initialQuery && /^\s*SELECT\b/i.test(initialQuery)) {
-      runQuery(initialQuery);
-    }
-  }, [initialQuery]);
+    if (!initialQuery || !/^\s*SELECT\b/i.test(initialQuery)) return;
+    let cancelled = false;
+    const runId = ++activeRunIdRef.current;
+
+    (async () => {
+      try {
+        const res = await onExecuteQuery(initialQuery.trim());
+        if (cancelled || activeRunIdRef.current !== runId) return;
+        setResult(res);
+        setActiveBottomTab(res.error ? 'messages' : 'grid');
+      } catch (err: any) {
+        if (cancelled || activeRunIdRef.current !== runId) return;
+        setResult({
+          columns: [],
+          rows: [],
+          executionTimeMs: 0,
+          fetchTimeMs: 0,
+          rowCount: 0,
+          query: initialQuery,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        setActiveBottomTab('messages');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialQuery, onExecuteQuery]);
 
   const moveCompletionSelection = (step: number, total: number) => {
     setSelectedCompletionIdx((prev) => {
@@ -232,16 +262,19 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
     });
   };
 
+  const isAcceptCompletionKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) =>
+    e.key === 'Tab' || (e.key === 'Enter' && !e.ctrlKey);
+
   const handleCompletionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
-    const items = completionResult?.items;
-    if (!items?.length) return false;
+    if (!completionResult || completionResult.items.length === 0) return false;
+    const { items } = completionResult;
 
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       moveCompletionSelection(e.key === 'ArrowDown' ? 1 : -1, items.length);
       return true;
     }
-    if (e.key === 'Tab' || (e.key === 'Enter' && !e.ctrlKey)) {
+    if (isAcceptCompletionKey(e)) {
       e.preventDefault();
       applyCompletion(items[selectedCompletionIdx]);
       return true;

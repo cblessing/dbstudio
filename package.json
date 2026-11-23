@@ -107,7 +107,9 @@
     "build": "vite build && npm run build:extension",
     "preview": "vite preview",
     "clean": "node -e \"['dist', 'out'].forEach(d => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) {} })\"",
-    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint:eslint": "eslint .",
+    "lint": "npm run typecheck && npm run lint:eslint",
     "test": "tsx --test src/utils/erDiagramLayout.test.ts src/utils/exportData.test.ts src/utils/sqlCompletion.test.ts src/utils/sqlFormatter.test.ts src/utils/tableManagement.test.ts src/engine/sqlEngineCore.test.ts src/engine/databaseManager.test.ts",
     "package:extension": "npm run build && npx @vscode/vsce package --no-dependencies --allow-missing-repository",
     "publish:extension": "npm run build && npx @vscode/vsce publish"
@@ -128,13 +130,18 @@
     "vite": "^8.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
-    "@types/express": "^4.17.21"
+    "typescript-eslint": "^8.73.0"
   }
 }
