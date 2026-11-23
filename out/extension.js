@@ -6,6 +6,8 @@ const vscode = require("vscode");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
+const connectionService_1 = require("./drivers/connectionService");
+const rpcHandler_1 = require("./drivers/rpcHandler");
 class ExtensionStateStore {
     connections = undefined;
     ddlHistory = [];
@@ -53,7 +55,21 @@ class ExtensionStateStore {
     }
 }
 const stateStore = new ExtensionStateStore();
+let liveConnectionService = null;
+function createFallbackSecretStore() {
+    const mem = new Map();
+    return {
+        get: async (k) => mem.get(k),
+        store: async (k, v) => {
+            mem.set(k, v);
+        },
+        delete: async (k) => {
+            mem.delete(k);
+        },
+    };
+}
 function activate(context) {
+    liveConnectionService = new connectionService_1.LiveConnectionService(context.secrets ?? createFallbackSecretStore());
     const openDisposable = vscode.commands.registerCommand('database-studio.open', () => {
         openEditorTab(context.extensionUri, { editorType: 'query' });
     });
@@ -250,7 +266,10 @@ function registerWebviewMessageHandler(webview, extensionUri, disposables) {
     webview.onDidReceiveMessage(async (message) => {
         if (!message || typeof message !== 'object')
             return;
-        await dispatchWebviewMessage(message, webview, extensionUri);
+        const msg = message;
+        if (await (0, rpcHandler_1.tryHandleLiveRpcMessage)(liveConnectionService, webview, msg))
+            return;
+        await dispatchWebviewMessage(msg, webview, extensionUri);
     }, null, disposables);
 }
 function serializeForInlineScript(value) {

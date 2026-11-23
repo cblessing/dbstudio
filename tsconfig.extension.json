@@ -10,5 +10,6 @@
     "skipLibCheck": true,
     "types": ["node", "vscode"]
   },
-  "include": ["src-extension"]
+  "include": ["src-extension"],
+  "exclude": ["src-extension/**/*.test.ts"]
 }

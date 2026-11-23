@@ -110,13 +110,20 @@
     "typecheck": "tsc --noEmit",
     "lint:eslint": "eslint .",
     "lint": "npm run typecheck && npm run lint:eslint",
-    "test": "tsx --test src/utils/erDiagramLayout.test.ts src/utils/exportData.test.ts src/utils/sqlCompletion.test.ts src/utils/sqlFormatter.test.ts src/utils/tableManagement.test.ts src/engine/sqlEngineCore.test.ts src/engine/databaseManager.test.ts",
+    "test": "tsx --test src/utils/erDiagramLayout.test.ts src/utils/exportData.test.ts src/utils/sqlCompletion.test.ts src/utils/sqlFormatter.test.ts src/utils/tableManagement.test.ts src/engine/sqlEngineCore.test.ts src/engine/databaseManager.test.ts src-extension/drivers/connectionService.test.ts",
     "package:extension": "npm run build && npx @vscode/vsce package --no-dependencies --allow-missing-repository",
     "publish:extension": "npm run build && npx @vscode/vsce publish"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.25.0",
+    "ioredis": "^6.0.0",
     "lucide-react": "^0.546.0",
+    "mongodb": "^7.9.1",
     "motion": "^12.23.24",
+    "mssql": "^12.8.1",
+    "mysql2": "^3.24.6",
+    "oracledb": "^26.0.0",
+    "pg": "^8.23.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "sql.js": "^1.15.2"

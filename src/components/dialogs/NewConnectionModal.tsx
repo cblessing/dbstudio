@@ -8,8 +8,14 @@ import {
   buildDefaultSchemaForType,
 } from '../../engine/sqlEngineCore';
 import {
+  isVsCodeWebview,
+  testLiveConnection,
+  saveLiveConnection,
+  introspectLiveSchema,
+  LiveConnectionPayload,
+} from '../../utils/liveBridge';
+import {
   X,
-  Search,
   CheckCircle2,
   AlertCircle,
   Zap,
@@ -17,6 +23,7 @@ import {
   ArrowRight,
   RefreshCw,
 } from 'lucide-react';
+import { DriverPickerStep } from './DriverPickerStep';
 
 interface NewConnectionModalProps {
   isOpen: boolean;
@@ -29,87 +36,6 @@ interface TestConnectionStatus {
   success?: boolean;
   latencyMs?: number;
   message?: string;
-}
-
-function DriverPickerStep({
-  searchQuery,
-  onSearchChange,
-  categoryFilter,
-  onCategoryChange,
-  drivers,
-  onSelectDriver,
-}: {
-  searchQuery: string;
-  onSearchChange: (val: string) => void;
-  categoryFilter: 'all' | 'relational' | 'analytical' | 'nosql';
-  onCategoryChange: (cat: 'all' | 'relational' | 'analytical' | 'nosql') => void;
-  drivers: DatabaseDriverInfo[];
-  onSelectDriver: (driver: DatabaseDriverInfo) => void;
-}) {
-  return (
-    <div className="flex flex-col p-5 gap-4 max-h-[75vh] overflow-y-auto">
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-[#858585]" />
-          <input
-            type="text"
-            placeholder="Search database engines (Postgres, DuckDB, MySQL, SQLite, Redis...)"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-[#1e1e1e] border border-[#3c3c3c] focus:border-[#007acc] rounded-lg px-3 pl-8 py-2 text-white outline-none"
-            aria-label="Search database engines"
-          />
-        </div>
-
-        <div className="flex items-center gap-1 bg-[#1e1e1e] p-1 rounded-lg border border-[#3c3c3c] shrink-0">
-          {(['all', 'relational', 'analytical', 'nosql'] as const).map((cat) => (
-            <button
-              key={cat}
-              onClick={() => onCategoryChange(cat)}
-              className={`px-2.5 py-1 rounded text-[11px] font-medium capitalize transition-colors ${
-                categoryFilter === cat
-                  ? 'bg-[#007acc] text-white'
-                  : 'text-[#858585] hover:text-white'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {drivers.map((driver) => (
-          <div
-            key={driver.id}
-            onClick={() => onSelectDriver(driver)}
-            className="flex items-start gap-3 p-3 bg-[#1e1e1e] border border-[#333333] hover:border-[#007acc] hover:bg-[#2a2d2e] rounded-lg cursor-pointer transition-all group shadow-sm"
-          >
-            <div
-              className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-xs shadow-md"
-              style={{ backgroundColor: driver.color }}
-            >
-              {driver.id.slice(0, 3).toUpperCase()}
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-1">
-                <span className="font-semibold text-white group-hover:text-sky-300">
-                  {driver.name}
-                </span>
-                <span className="bg-[#252526] text-[#858585] border border-[#3c3c3c] text-[9px] px-1.5 py-0.2 rounded capitalize">
-                  {driver.category}
-                </span>
-              </div>
-              <p className="text-[11px] text-[#858585] line-clamp-2 mt-0.5">
-                {driver.description}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 function TestStatusBanner({ status }: { status: TestConnectionStatus }) {
@@ -193,6 +119,7 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [ssl, setSsl] = useState(true);
+  const [allowSelfSigned, setAllowSelfSigned] = useState(false);
   const [testStatus, setTestStatus] = useState<TestConnectionStatus | null>(null);
 
   if (!isOpen) return null;
@@ -202,36 +129,78 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
     setConnectionName(driver.name);
     setPort(driver.defaultPort);
     setSsl(driver.defaultPort > 0);
+    setAllowSelfSigned(false);
     setDatabase('');
     setTestStatus(null);
     setStep('configure');
   };
 
   const filteredDrivers = filterDriversByQuery(DATABASE_DRIVERS, categoryFilter, searchQuery);
+  const canUseLiveDriver = isVsCodeWebview() && selectedDriver.defaultPort > 0;
 
-  const handleTestConnection = () => {
+  const buildLivePayload = (connId: string): LiveConnectionPayload => ({
+    id: connId,
+    type: selectedDriver.id,
+    host: host.trim() || 'localhost',
+    port: Number(port) || selectedDriver.defaultPort,
+    database: database.trim() || selectedDriver.id,
+    username: username.trim(),
+    ssl,
+    rejectUnauthorized: !allowSelfSigned,
+  });
+
+  const handleTestConnection = async () => {
     setTestStatus({ testing: true });
+    if (canUseLiveDriver) {
+      try {
+        const res = await testLiveConnection(buildLivePayload(`test_${selectedDriver.id}`), password);
+        setTestStatus({
+          testing: false,
+          success: res.success,
+          latencyMs: res.latencyMs,
+          message: res.version ? `${res.message} ${res.version}` : res.message,
+        });
+      } catch (err) {
+        setTestStatus({
+          testing: false,
+          success: false,
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return;
+    }
+
     setTimeout(() => {
       const isEmbedded = selectedDriver.defaultPort === 0;
-      const latency = isEmbedded
-        ? +(Math.random() * 0.8 + 0.2).toFixed(2)
-        : +(Math.random() * 15 + 8).toFixed(1);
-      const sslState = ssl ? 'Active' : 'Off';
-
+      const latency = isEmbedded ? 0.4 : 12.5;
       setTestStatus({
         testing: false,
         success: true,
         latencyMs: latency,
         message: isEmbedded
-          ? `Connected successfully in ${latency}ms.`
-          : `Connected to ${selectedDriver.name} at ${host}:${port} in ${latency}ms. SSL: ${sslState}.`,
+          ? `Connected locally in ${latency}ms.`
+          : `Local workspace mode: ${selectedDriver.name} (${host}:${port}, SSL: ${ssl ? 'On' : 'Off'}).`,
       });
-    }, 700);
+    }, 300);
   };
 
-  const handleSaveConnection = () => {
+  const handleSaveConnection = async () => {
+    const connId = `conn_${Date.now()}_${selectedDriver.id}`;
+    const defaultSchema = buildDefaultSchemaForType(selectedDriver.id);
+    let schemas = [defaultSchema];
+    let connectionMode: 'local' | 'live' = 'local';
+
+    if (canUseLiveDriver) {
+      await saveLiveConnection(buildLivePayload(connId), password);
+      connectionMode = 'live';
+      const liveTables = await introspectLiveSchema(connId).catch(() => []);
+      if (liveTables.length > 0) {
+        schemas = [{ ...defaultSchema, tables: liveTables }];
+      }
+    }
+
     const newConn: DatabaseConnection = {
-      id: `conn_${Date.now()}_${selectedDriver.id}`,
+      id: connId,
       name: connectionName ? connectionName : `${selectedDriver.name} Connection`,
       type: selectedDriver.id,
       host,
@@ -239,11 +208,13 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
       database: database ? database : selectedDriver.id,
       username,
       ssl,
+      rejectUnauthorized: !allowSelfSigned,
+      connectionMode,
       colorBadge: selectedDriver.color,
       status: 'connected',
       pingMs: testStatus?.latencyMs ?? 1.2,
       version: selectedDriver.name,
-      schemas: [buildDefaultSchemaForType(selectedDriver.id)],
+      schemas,
     };
 
     onAddConnection(newConn);
@@ -387,21 +358,34 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
                   />
                 </div>
 
-                <div className="pt-5 flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="ssl_toggle"
-                    checked={ssl}
-                    onChange={(e) => setSsl(e.target.checked)}
-                    className="rounded bg-[#1e1e1e] border-[#3c3c3c] text-[#007acc] focus:ring-0"
-                  />
-                  <label
-                    htmlFor="ssl_toggle"
-                    className="text-[#cccccc] cursor-pointer flex items-center gap-1"
-                  >
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Use SSL / TLS Encryption</span>
-                  </label>
+                <div className="pt-5 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="ssl_toggle"
+                      checked={ssl}
+                      onChange={(e) => setSsl(e.target.checked)}
+                      className="rounded bg-[#1e1e1e] border-[#3c3c3c] text-[#007acc] focus:ring-0"
+                    />
+                    <label
+                      htmlFor="ssl_toggle"
+                      className="text-[#cccccc] cursor-pointer flex items-center gap-1"
+                    >
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Use SSL / TLS Encryption</span>
+                    </label>
+                  </div>
+                  {ssl && (
+                    <label className="flex items-center gap-2 text-[11px] text-[#969696] cursor-pointer pl-5">
+                      <input
+                        type="checkbox"
+                        checked={allowSelfSigned}
+                        onChange={(e) => setAllowSelfSigned(e.target.checked)}
+                        className="rounded bg-[#1e1e1e] border-[#3c3c3c] text-[#007acc] focus:ring-0"
+                      />
+                      <span>Allow self-signed certificate</span>
+                    </label>
+                  )}
                 </div>
               </div>
 

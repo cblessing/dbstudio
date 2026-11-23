@@ -84,6 +84,8 @@ export interface DatabaseConnection {
   username: string;
   password?: string;
   ssl: boolean;
+  rejectUnauthorized?: boolean;
+  connectionMode?: 'local' | 'live';
   colorBadge: string;
   status: 'connected' | 'disconnected' | 'connecting';
   schemas: SchemaDefinition[];

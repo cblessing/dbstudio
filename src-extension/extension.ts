@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import { LiveConnectionService, SecretStoreLike } from './drivers/connectionService';
+import { tryHandleLiveRpcMessage } from './drivers/rpcHandler';
 
 interface EditorTabConfig {
   editorType: 'query' | 'erd' | 'table';
@@ -66,8 +68,25 @@ class ExtensionStateStore {
 }
 
 const stateStore = new ExtensionStateStore();
+let liveConnectionService: LiveConnectionService | null = null;
+
+function createFallbackSecretStore(): SecretStoreLike {
+  const mem = new Map<string, string>();
+  return {
+    get: async (k) => mem.get(k),
+    store: async (k, v) => {
+      mem.set(k, v);
+    },
+    delete: async (k) => {
+      mem.delete(k);
+    },
+  };
+}
 
 export function activate(context: vscode.ExtensionContext) {
+  liveConnectionService = new LiveConnectionService(
+    context.secrets ?? createFallbackSecretStore()
+  );
   const openDisposable = vscode.commands.registerCommand(
     'database-studio.open',
     () => {
@@ -331,7 +350,9 @@ function registerWebviewMessageHandler(
   webview.onDidReceiveMessage(
     async (message: unknown) => {
       if (!message || typeof message !== 'object') return;
-      await dispatchWebviewMessage(message as Record<string, any>, webview, extensionUri);
+      const msg = message as Record<string, any>;
+      if (await tryHandleLiveRpcMessage(liveConnectionService, webview, msg)) return;
+      await dispatchWebviewMessage(msg, webview, extensionUri);
     },
     null,
     disposables
