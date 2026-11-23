@@ -192,7 +192,7 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
   const [database, setDatabase] = useState('');
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
-  const [ssl, setSsl] = useState(false);
+  const [ssl, setSsl] = useState(true);
   const [testStatus, setTestStatus] = useState<TestConnectionStatus | null>(null);
 
   if (!isOpen) return null;
@@ -201,6 +201,7 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
     setSelectedDriver(driver);
     setConnectionName(driver.name);
     setPort(driver.defaultPort);
+    setSsl(driver.defaultPort > 0);
     setDatabase('');
     setTestStatus(null);
     setStep('configure');
@@ -237,7 +238,6 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
       port,
       database: database ? database : selectedDriver.id,
       username,
-      password,
       ssl,
       colorBadge: selectedDriver.color,
       status: 'connected',

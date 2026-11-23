@@ -102,3 +102,18 @@ test('generateCreateTableSql outputs T-SQL DDL with NVARCHAR and INT IDENTITY', 
   assert.ok(sql.includes('[EventId] INT IDENTITY(1,1) PRIMARY KEY'));
   assert.ok(sql.includes('[EventName] NVARCHAR(100) NOT NULL'));
 });
+
+test('tableManagement escapes single quotes and sanitizes default values against SQL injection', () => {
+  const renameSql = generateRenameTableSql("users'; DROP TABLE x; --", "safe'name", 'sqlserver');
+  assert.ok(renameSql.includes("EXEC sp_rename 'dbo.users'' DROP TABLE x --', 'safe''name';"));
+
+  const addColSql = generateAddColumnSql('products', {
+    name: 'note',
+    type: 'VARCHAR(50); DROP TABLE products',
+    nullable: true,
+    primaryKey: false,
+    defaultValue: "0'; DROP TABLE products; --",
+  });
+  assert.ok(addColSql.includes('`note` VARCHAR(50) DEFAULT'));
+  assert.ok(addColSql.includes("DEFAULT '0''; DROP TABLE products; --'"));
+});

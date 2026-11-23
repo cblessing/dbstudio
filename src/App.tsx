@@ -31,6 +31,7 @@ import {
   downloadFile,
   formatSqlValue,
   postVsCodeMessage,
+  quoteSqlIdentifier,
 } from './utils/exportData';
 import {
   VsCodeViewMode,
@@ -87,10 +88,12 @@ export default function App() {
 
   useVsCodeHostSync(setConnections, setTabs, setIsCommandPaletteOpen);
 
-  const broadcastConnectionsUpdate = (
-    nextConnections: DatabaseConnection[],
-    ddlQuery?: string
-  ) => postVsCodeMessage({ command: 'stateUpdate', connections: nextConnections, ddlQuery });
+  const broadcastConnectionsUpdate = (nextConnections: DatabaseConnection[], ddlQuery?: string) =>
+    postVsCodeMessage({
+      command: 'stateUpdate',
+      connections: nextConnections.map(({ password: _pw, ...conn }) => (void _pw, conn)),
+      ddlQuery,
+    });
 
   const updateConnectionTables = (
     targetConnId: string | null,
@@ -212,24 +215,28 @@ export default function App() {
   };
 
   const handleUpdateRow = async (rowIndex: number, colName: string, newValue: any) => {
-    const tableName = getActiveTableName();
-    const sql = `UPDATE ${tableName} SET ${colName} = ${formatSqlValue(newValue)} WHERE id = (SELECT id FROM ${tableName} LIMIT 1 OFFSET ${rowIndex});`;
+    const tableId = quoteSqlIdentifier(getActiveTableName());
+    const colId = quoteSqlIdentifier(colName);
+    const safeOffset = Math.max(0, Math.floor(rowIndex));
+    const sql = `UPDATE ${tableId} SET ${colId} = ${formatSqlValue(newValue)} WHERE id = (SELECT id FROM ${tableId} LIMIT 1 OFFSET ${safeOffset});`;
     await handleExecuteQuery(sql);
   };
 
   const handleAddRow = async (newRow: Record<string, any>) => {
-    const tableName = getActiveTableName();
+    const tableId = quoteSqlIdentifier(getActiveTableName());
     const columns = Object.keys(newRow).filter((k) => newRow[k] !== '');
     if (columns.length === 0) return;
 
+    const colList = columns.map((k) => quoteSqlIdentifier(k)).join(', ');
     const values = columns.map((k) => formatSqlValue(newRow[k]));
-    const sql = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${values.join(', ')});`;
+    const sql = `INSERT INTO ${tableId} (${colList}) VALUES (${values.join(', ')});`;
     await handleExecuteQuery(sql);
   };
 
   const handleDeleteRow = async (rowIndex: number) => {
-    const tableName = getActiveTableName();
-    const sql = `DELETE FROM ${tableName} WHERE id = (SELECT id FROM ${tableName} LIMIT 1 OFFSET ${rowIndex});`;
+    const tableId = quoteSqlIdentifier(getActiveTableName());
+    const safeOffset = Math.max(0, Math.floor(rowIndex));
+    const sql = `DELETE FROM ${tableId} WHERE id = (SELECT id FROM ${tableId} LIMIT 1 OFFSET ${safeOffset});`;
     await handleExecuteQuery(sql);
   };
 

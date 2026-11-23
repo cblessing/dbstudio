@@ -5,6 +5,7 @@ exports.deactivate = deactivate;
 const vscode = require("vscode");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 class ExtensionStateStore {
     connections = undefined;
     ddlHistory = [];
@@ -26,7 +27,7 @@ class ExtensionStateStore {
     }
     broadcastState(sender, connections, ddlQuery) {
         if (connections) {
-            this.connections = connections;
+            this.connections = stripConnectionSecrets(connections);
         }
         if (ddlQuery) {
             this.ddlHistory.push(ddlQuery);
@@ -163,14 +164,40 @@ class DatabaseStudioSidebarProvider {
         });
     }
 }
+function stripConnectionSecrets(connections) {
+    return connections.map((conn) => {
+        if (!conn || typeof conn !== 'object')
+            return conn;
+        const { password: _omitted, ...safeConn } = conn;
+        void _omitted;
+        return safeConn;
+    });
+}
+function sanitizeFilename(rawName) {
+    const base = typeof rawName === 'string' ? path.basename(rawName.trim()) : '';
+    if (!base || base === '.' || base === '..')
+        return 'export.txt';
+    return base;
+}
+function parseEditorConfig(message) {
+    const allowedTypes = ['query', 'erd', 'table'];
+    const editorType = allowedTypes.includes(message.editorType) ? message.editorType : 'query';
+    return {
+        editorType,
+        connectionId: typeof message.connectionId === 'string' ? message.connectionId : undefined,
+        tableName: typeof message.tableName === 'string' ? message.tableName : undefined,
+        title: typeof message.title === 'string' ? message.title : undefined,
+        initialQuery: typeof message.initialQuery === 'string' ? message.initialQuery : undefined,
+    };
+}
 function writeExportPayload(savePath, message) {
     const buffer = message.isBase64
-        ? Buffer.from(message.content, 'base64')
+        ? Buffer.from(String(message.content ?? ''), 'base64')
         : Buffer.from(String(message.content ?? ''), 'utf8');
     fs.writeFileSync(savePath, buffer);
 }
 async function handleSaveFileMessage(message) {
-    const defaultFilename = message.filename ? message.filename : 'export.txt';
+    const defaultFilename = sanitizeFilename(message.filename);
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
     const defaultUri = workspaceFolder
         ? vscode.Uri.joinPath(workspaceFolder, defaultFilename)
@@ -190,48 +217,73 @@ async function handleSaveFileMessage(message) {
         vscode.window.showErrorMessage(`Failed to save file: ${errText}`);
     }
 }
+function handleStateUpdateMessage(webview, message) {
+    const conns = Array.isArray(message.connections) ? message.connections : undefined;
+    const ddl = typeof message.ddlQuery === 'string' ? message.ddlQuery : undefined;
+    stateStore.broadcastState(webview, conns, ddl);
+}
+async function dispatchWebviewMessage(message, webview, extensionUri) {
+    switch (message.command) {
+        case 'alert':
+            if (typeof message.text === 'string')
+                vscode.window.showInformationMessage(message.text);
+            return;
+        case 'error':
+            if (typeof message.text === 'string')
+                vscode.window.showErrorMessage(message.text);
+            return;
+        case 'openFullView':
+            vscode.commands.executeCommand('database-studio.open');
+            return;
+        case 'openEditor':
+            openEditorTab(extensionUri, parseEditorConfig(message));
+            return;
+        case 'stateUpdate':
+            handleStateUpdateMessage(webview, message);
+            return;
+        case 'saveFile':
+            await handleSaveFileMessage(message);
+            return;
+    }
+}
 function registerWebviewMessageHandler(webview, extensionUri, disposables) {
     webview.onDidReceiveMessage(async (message) => {
-        switch (message.command) {
-            case 'alert':
-                vscode.window.showInformationMessage(message.text);
-                return;
-            case 'error':
-                vscode.window.showErrorMessage(message.text);
-                return;
-            case 'openFullView':
-                vscode.commands.executeCommand('database-studio.open');
-                return;
-            case 'openEditor':
-                openEditorTab(extensionUri, {
-                    editorType: message.editorType ? message.editorType : 'query',
-                    connectionId: message.connectionId,
-                    tableName: message.tableName,
-                    title: message.title,
-                    initialQuery: message.initialQuery,
-                });
-                return;
-            case 'stateUpdate':
-                stateStore.broadcastState(webview, message.connections, message.ddlQuery);
-                return;
-            case 'saveFile':
-                await handleSaveFileMessage(message);
-                return;
-        }
+        if (!message || typeof message !== 'object')
+            return;
+        await dispatchWebviewMessage(message, webview, extensionUri);
     }, null, disposables);
+}
+function serializeForInlineScript(value) {
+    return JSON.stringify(value)
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/&/g, '\\u0026')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029');
+}
+function buildWebviewCsp(webview, nonce) {
+    const cspSource = webview.cspSource || '';
+    return [
+        "default-src 'none'",
+        `img-src ${cspSource} data: blob:`,
+        `style-src ${cspSource} 'unsafe-inline'`,
+        `font-src ${cspSource} data:`,
+        `script-src 'nonce-${nonce}' 'wasm-unsafe-eval'`,
+        `connect-src ${cspSource} data: blob:`,
+    ].join('; ');
 }
 function buildBootstrapScriptContent(viewMode, editorConfig) {
     const lines = [
-        `window.__VSCODE_VIEW_MODE__ = ${JSON.stringify(viewMode)};`,
+        `window.__VSCODE_VIEW_MODE__ = ${serializeForInlineScript(viewMode)};`,
     ];
     if (editorConfig) {
-        lines.push(`window.__VSCODE_EDITOR_CONFIG__ = ${JSON.stringify(editorConfig)};`);
+        lines.push(`window.__VSCODE_EDITOR_CONFIG__ = ${serializeForInlineScript(editorConfig)};`);
     }
     if (stateStore.connections) {
-        lines.push(`window.__VSCODE_INITIAL_CONNECTIONS__ = ${JSON.stringify(stateStore.connections)};`);
+        lines.push(`window.__VSCODE_INITIAL_CONNECTIONS__ = ${serializeForInlineScript(stateStore.connections)};`);
     }
     if (stateStore.ddlHistory.length > 0) {
-        lines.push(`window.__VSCODE_DDL_HISTORY__ = ${JSON.stringify(stateStore.ddlHistory)};`);
+        lines.push(`window.__VSCODE_DDL_HISTORY__ = ${serializeForInlineScript(stateStore.ddlHistory)};`);
     }
     return lines.join('\n      ');
 }
@@ -241,12 +293,15 @@ function getWebviewHtml(webview, extensionUri, viewMode = 'editor', editorConfig
     if (fs.existsSync(indexPath)) {
         let html = fs.readFileSync(indexPath, 'utf8');
         const distUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist'));
+        const nonce = crypto.randomBytes(16).toString('base64');
+        const csp = buildWebviewCsp(webview, nonce);
         html = html.replace(/(href|src)="(?!https?:\/\/|data:|vscode-|#)\/?(?:\.\/)?([^"]+)"/g, (_match, attr, relPath) => {
             const resourceUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', relPath));
             return `${attr}="${resourceUri}"`;
         });
+        html = html.replace(/<script\b/g, `<script nonce="${nonce}"`);
         const bootstrapScripts = buildBootstrapScriptContent(viewMode, editorConfig);
-        const headInjection = `<head>\n    <base href="${distUri}/" />\n    <script>\n      ${bootstrapScripts}\n    </script>`;
+        const headInjection = `<head>\n    <meta http-equiv="Content-Security-Policy" content="${csp}" />\n    <base href="${distUri}/" />\n    <script nonce="${nonce}">\n      ${bootstrapScripts}\n    </script>`;
         return html.replace('<head>', headInjection);
     }
     return `<!DOCTYPE html>

@@ -12,6 +12,20 @@ import {
 } from './sqlEngineCore';
 import { QueryResult, TableDefinition, ViewDefinition } from '../types/database';
 import { preprocessDialectQuery } from './dialectPreprocessor';
+import { quoteSqlIdentifier } from '../utils/exportData';
+
+const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
+const SQLITE_HEADER_MAGIC = 'SQLite format 3\0';
+
+function isValidSqliteBinary(fileBuffer: Uint8Array): boolean {
+  if (fileBuffer.byteLength < SQLITE_HEADER_MAGIC.length || fileBuffer.byteLength > MAX_IMPORT_BYTES) {
+    return false;
+  }
+  for (let i = 0; i < SQLITE_HEADER_MAGIC.length; i++) {
+    if (fileBuffer[i] !== SQLITE_HEADER_MAGIC.charCodeAt(i)) return false;
+  }
+  return true;
+}
 
 export { preprocessDialectQuery };
 
@@ -327,7 +341,10 @@ class DatabaseManager {
     limit = DEFAULT_QUERY_BATCH_SIZE,
     offset = 0
   ): Promise<QueryResult> {
-    return this.executeQuery(`SELECT * FROM ${tableName}`, { offset, batchSize: limit });
+    return this.executeQuery(`SELECT * FROM ${quoteSqlIdentifier(tableName)}`, {
+      offset,
+      batchSize: limit,
+    });
   }
 
   public exportDatabaseBinary(): Uint8Array | null {
@@ -336,7 +353,7 @@ class DatabaseManager {
 
   public async importDatabaseBinary(fileBuffer: Uint8Array): Promise<boolean> {
     await this.init();
-    if (!this.sqlJs) return false;
+    if (!this.sqlJs || !isValidSqliteBinary(fileBuffer)) return false;
     try {
       this.db = new this.sqlJs.Database(fileBuffer);
       return true;

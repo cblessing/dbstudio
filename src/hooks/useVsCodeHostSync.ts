@@ -95,6 +95,11 @@ export function findConnectionOrFallback(
   return match ? match : fallback;
 }
 
+function isTrustedMessageOrigin(origin: string): boolean {
+  if (!origin) return false;
+  return origin === window.location.origin || origin.startsWith('vscode-webview://');
+}
+
 export function useVsCodeHostSync(
   setConnections: React.Dispatch<React.SetStateAction<DatabaseConnection[]>>,
   setTabs: React.Dispatch<React.SetStateAction<EditorTab[]>>,
@@ -102,24 +107,30 @@ export function useVsCodeHostSync(
 ) {
   useEffect(() => {
     const initialHistory = getInjectedGlobal<string[]>('__VSCODE_DDL_HISTORY__');
-    if (!initialHistory) return;
+    if (!Array.isArray(initialHistory)) return;
     (async () => {
       for (const sql of initialHistory) {
-        await databaseManager.executeQuery(sql);
+        if (typeof sql !== 'string') continue;
+        try {
+          await databaseManager.executeQuery(sql);
+        } catch (err) {
+          console.error('Failed to replay DDL statement', err);
+        }
       }
     })();
   }, []);
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
+      if (!isTrustedMessageOrigin(event.origin)) return;
       const msg = event.data;
-      if (!msg) return;
+      if (!msg || typeof msg !== 'object') return;
 
       if (msg.command === 'syncState') {
-        if (msg.connections) setConnections(msg.connections);
-        if (msg.ddlQuery) await databaseManager.executeQuery(msg.ddlQuery);
+        if (Array.isArray(msg.connections)) setConnections(msg.connections);
+        if (typeof msg.ddlQuery === 'string') await databaseManager.executeQuery(msg.ddlQuery);
       } else if (msg.command === 'updateEditorQuery') {
-        const nextSql = String(msg.initialQuery ? msg.initialQuery : '');
+        const nextSql = typeof msg.initialQuery === 'string' ? msg.initialQuery : '';
         setTabs((prev) =>
           prev.map((t, idx) => (idx === 0 ? { ...t, queryContent: nextSql } : t))
         );

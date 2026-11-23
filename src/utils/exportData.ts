@@ -1,5 +1,9 @@
 import { QueryResult } from '../types/database';
 
+export function quoteSqlIdentifier(name: string): string {
+  return `\`${String(name).replace(/`/g, '``')}\``;
+}
+
 export function formatSqlValue(val: any): string {
   if (val === null || val === undefined) return 'NULL';
   if (typeof val === 'number') return String(val);
@@ -24,12 +28,17 @@ export function mergePaginatedResults(
   };
 }
 
+function neutralizeCsvFormula(str: string): string {
+  return /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+}
+
 export function exportToCsv(columns: string[], rows: Record<string, any>[]): string {
   if (!columns.length) return '';
   const escapeCell = (val: any): string => {
     if (val === null || val === undefined) return '';
-    const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    const rawStr = typeof val === 'object' ? JSON.stringify(val) : String(val);
+    const str = typeof val === 'number' ? rawStr : neutralizeCsvFormula(rawStr);
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
       return `"${str.replace(/"/g, '""')}"`;
     }
     return str;
@@ -51,12 +60,12 @@ export function exportToSqlInsert(
   rows: Record<string, any>[]
 ): string {
   if (!columns.length || !rows.length) return '';
-  const safeTable = tableName || 'exported_table';
+  const safeTable = quoteSqlIdentifier(tableName || 'exported_table');
 
-  const colList = columns.map((c) => `\`${c}\``).join(', ');
+  const colList = columns.map((c) => quoteSqlIdentifier(c)).join(', ');
   const insertStatements = rows.map((row) => {
     const valList = columns.map((col) => formatSqlValue(row[col])).join(', ');
-    return `INSERT INTO \`${safeTable}\` (${colList}) VALUES (${valList});`;
+    return `INSERT INTO ${safeTable} (${colList}) VALUES (${valList});`;
   });
 
   return insertStatements.join('\n');
@@ -101,6 +110,16 @@ export function postVsCodeMessage(msg: any): boolean {
   return false;
 }
 
+function encodeUint8ArrayToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+    const slice = bytes.subarray(i, i + chunkSize);
+    chunks.push(String.fromCharCode(...slice));
+  }
+  return btoa(chunks.join(''));
+}
+
 export function downloadFile(
   filename: string,
   content: string | Uint8Array,
@@ -109,14 +128,10 @@ export function downloadFile(
   const vscode = getVsCodeApi();
   if (vscode) {
     if (content instanceof Uint8Array) {
-      let binary = '';
-      for (let i = 0; i < content.byteLength; i++) {
-        binary += String.fromCharCode(content[i]);
-      }
       vscode.postMessage({
         command: 'saveFile',
         filename,
-        content: btoa(binary),
+        content: encodeUint8ArrayToBase64(content),
         isBase64: true,
       });
     } else {

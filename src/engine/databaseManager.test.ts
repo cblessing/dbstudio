@@ -193,6 +193,7 @@ test('compiled VS Code extension activates and generates valid Webview HTML', as
       createWebviewPanel: () => {
         const webview = {
           _html: '',
+          cspSource: 'https://file+.vscode-resource.vscode-cdn.net',
           get html() {
             return this._html;
           },
@@ -242,8 +243,16 @@ test('compiled VS Code extension activates and generates valid Webview HTML', as
     assert.ok(createdPanelHtml.includes('window.__VSCODE_VIEW_MODE__ = "editor"'));
     assert.ok(createdPanelHtml.includes('window.__VSCODE_EDITOR_CONFIG__ = {"editorType":"query"'));
     assert.ok(createdPanelHtml.includes('<base href="https://file+.vscode-resource.vscode-cdn.net/'));
-    assert.ok(createdPanelHtml.includes('href="https://fonts.googleapis.com"'));
+    assert.ok(createdPanelHtml.includes('http-equiv="Content-Security-Policy"'));
+    assert.ok(createdPanelHtml.includes("script-src 'nonce-"));
+    assert.ok(!createdPanelHtml.includes('fonts.googleapis.com'));
   } finally {
     CjsModule._load = origLoad;
   }
+});
+
+test('importDatabaseBinary rejects invalid non-SQLite byte buffers', async () => {
+  const invalidBytes = new TextEncoder().encode('not a sqlite database file');
+  const imported = await databaseManager.importDatabaseBinary(invalidBytes);
+  assert.equal(imported, false);
 });

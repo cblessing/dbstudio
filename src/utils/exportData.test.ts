@@ -40,3 +40,17 @@ test('exportToMarkdown creates markdown tables with header and pipes', () => {
   assert.ok(md.includes('| --- | --- | --- | --- |'));
   assert.ok(md.includes('| 1 | Gadget | 29.99 | Cool, fast gadget |'));
 });
+
+test('exportToCsv neutralizes spreadsheet formula injection while preserving numbers', () => {
+  const csv = exportToCsv(
+    ['formula', 'plus', 'negativeNum', 'atSign'],
+    [{ formula: '=SUM(A1:A2)', plus: '+cmd', negativeNum: -42.5, atSign: '@alert' }]
+  );
+  const lines = csv.split('\n');
+  assert.equal(lines[1], "'=SUM(A1:A2),'+cmd,-42.5,'@alert");
+});
+
+test('exportToSqlInsert escapes backticks in table and column identifiers', () => {
+  const sql = exportToSqlInsert('weird`table', ['col`1'], [{ 'col`1': "O'Reilly" }]);
+  assert.equal(sql, "INSERT INTO `weird``table` (`col``1`) VALUES ('O''Reilly');");
+});
