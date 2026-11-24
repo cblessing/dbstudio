@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { DatabaseDriverInfo, DatabaseConnection } from '../../types/database';
-import { DATABASE_DRIVERS, buildDefaultSchemaForType } from '../../engine/sqlEngineCore';
+import { DatabaseDriverInfo, DatabaseConnection, DatabaseType } from '../../types/database';
+import { DATABASE_DRIVERS } from '../../engine/sqlEngineCore';
 import {
   isNetworkDatabaseType,
   testLiveConnection,
@@ -189,16 +189,40 @@ function buildSavedConnectionRecord(
   };
 }
 
+const DEFAULT_USERNAMES: Partial<Record<DatabaseType, string>> = {
+  postgres: 'postgres',
+  mysql: 'root',
+  mariadb: 'root',
+  sqlserver: 'sa',
+  oracle: 'system',
+  clickhouse: 'default',
+  mongodb: 'root',
+  redis: '',
+};
+
+const DEFAULT_SCHEMA_NAMES: Partial<Record<DatabaseType, string>> = {
+  postgres: 'public',
+  sqlserver: 'dbo',
+  oracle: 'SYSTEM',
+  clickhouse: 'default',
+  mongodb: 'admin',
+  redis: 'db0',
+};
+
+function defaultSchemaNameFor(type: DatabaseType, database: string): string {
+  if (type === 'mysql' || type === 'mariadb') return database || 'dbstudio';
+  return DEFAULT_SCHEMA_NAMES[type] ?? (database || 'main');
+}
+
 async function persistLiveConnectionAndSchema(
   connId: string,
   payload: LiveConnectionPayload,
-  password: string,
-  defaultSchema: ReturnType<typeof buildDefaultSchemaForType>,
-  fallbackSchemas: DatabaseConnection['schemas']
+  password: string
 ): Promise<DatabaseConnection['schemas']> {
   await saveLiveConnection(payload, password);
   const liveTables = await introspectLiveSchema(connId).catch(() => []);
-  return liveTables.length > 0 ? [{ ...defaultSchema, tables: liveTables }] : fallbackSchemas;
+  const schemaName = liveTables[0]?.schema ?? defaultSchemaNameFor(payload.type, payload.database);
+  return [{ name: schemaName, tables: liveTables, views: [], procedures: [] }];
 }
 
 export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
@@ -232,6 +256,7 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
       selectedDriver: driver,
       connectionName: driver.name,
       port: driver.defaultPort,
+      username: DEFAULT_USERNAMES[driver.id] ?? '',
       ssl: driver.defaultPort > 0,
       allowSelfSigned: false,
       database: '',
@@ -262,12 +287,14 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
 
   const handleSaveConnection = async () => {
     const connId = editingConnection ? editingConnection.id : `conn_${Date.now()}_${form.selectedDriver.id}`;
-    const defaultSchema = buildDefaultSchemaForType(form.selectedDriver.id);
-    let schemas = editingConnection ? editingConnection.schemas : [defaultSchema];
+    const emptySchemaName = defaultSchemaNameFor(form.selectedDriver.id, form.database);
+    let schemas: DatabaseConnection['schemas'] = editingConnection
+      ? editingConnection.schemas
+      : [{ name: emptySchemaName, tables: [], views: [], procedures: [] }];
 
     if (isNetworkDriver) {
       try {
-        schemas = await persistLiveConnectionAndSchema(connId, buildLivePayload(connId, form), form.password, defaultSchema, schemas);
+        schemas = await persistLiveConnectionAndSchema(connId, buildLivePayload(connId, form), form.password);
       } catch (err) {
         setTestStatus({ testing: false, success: false, message: err instanceof Error ? err.message : String(err) });
         return;

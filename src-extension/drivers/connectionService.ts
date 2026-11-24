@@ -43,6 +43,7 @@ function secretKeyFor(connectionId: string): string {
 
 export class LiveConnectionService {
   private readonly configs = new Map<string, LiveConnectionConfig>();
+  private readonly sessionPasswords = new Map<string, string>();
   private readonly drivers: Record<LiveDriverType, LiveDatabaseDriver>;
 
   constructor(
@@ -61,6 +62,7 @@ export class LiveConnectionService {
     const { config } = validation;
     this.configs.set(config.id, config);
     if (typeof password === 'string' && password.length > 0) {
+      this.sessionPasswords.set(config.id, password);
       await this.secrets.store(secretKeyFor(config.id), password);
     }
     return config;
@@ -68,6 +70,7 @@ export class LiveConnectionService {
 
   public async deleteConnection(connectionId: string): Promise<void> {
     this.configs.delete(connectionId);
+    this.sessionPasswords.delete(connectionId);
     await this.secrets.delete(secretKeyFor(connectionId));
   }
 
@@ -79,6 +82,8 @@ export class LiveConnectionService {
     if (typeof overridePassword === 'string' && overridePassword.length > 0) {
       return overridePassword;
     }
+    const cached = this.sessionPasswords.get(connectionId);
+    if (cached) return cached;
     const stored = await this.secrets.get(secretKeyFor(connectionId));
     return stored ?? '';
   }

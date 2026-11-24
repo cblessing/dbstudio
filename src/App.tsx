@@ -5,10 +5,7 @@ import {
   QueryResult,
   TableDefinition,
 } from './types/database';
-import {
-  INITIAL_CONNECTIONS,
-  INITIAL_ECOMMERCE_TABLES,
-} from './engine/sqlEngineCore';
+import { INITIAL_CONNECTIONS } from './engine/sqlEngineCore';
 import { databaseManager } from './engine/databaseManager';
 import { StatusBar } from './components/vscode/StatusBar';
 import {
@@ -426,7 +423,7 @@ export default function App() {
     if (activeTab.type === 'erd') {
       return (
         <ERDiagramViewer
-          tables={tabConnection.schemas[0]?.tables ?? INITIAL_ECOMMERCE_TABLES}
+          tables={tabConnection.schemas[0]?.tables ?? []}
           connectionName={tabConnection.name}
           onSelectTable={(tblName) => openTableTab(tabConnection.id, tblName)}
         />

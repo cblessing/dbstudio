@@ -52,7 +52,18 @@ async function withPgClient<T>(
     ssl: buildTlsOption(config),
     connectionTimeoutMillis: config.timeoutMs ?? 10000,
   });
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.toLowerCase().includes('client password must be a string')) {
+      throw new Error(
+        'PostgreSQL requires a password for SCRAM authentication. Right-click the connection, choose "Edit Connection Settings...", and enter your password.',
+        { cause: err }
+      );
+    }
+    throw err;
+  }
   try {
     return await fn(client);
   } finally {
@@ -251,7 +262,8 @@ export const oracleDriver: LiveDatabaseDriver = {
   async executeQuery(config, password, query, options): Promise<LiveQueryResult> {
     const start = performance.now();
     return withOracleConn(config, password, async (conn, oracledb) => {
-      const res = await conn.execute(query.replace(/;\s*$/, ''), options?.params ?? [], {
+      const normalizedSql = /\bEND\s*;\s*$/i.test(query) ? query : query.replace(/;\s*$/, '');
+      const res = await conn.execute(normalizedSql, options?.params ?? [], {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
         autoCommit: true,
       });
