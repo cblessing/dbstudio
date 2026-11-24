@@ -92,6 +92,15 @@ export function upsertConnectionList(
     : [savedConn, ...prev];
 }
 
+export function resolveTabConnInfo(tabConnection: DatabaseConnection | null) {
+  return {
+    id: tabConnection?.id ?? '',
+    name: tabConnection?.name ?? 'No Connection',
+    database: tabConnection?.database ?? '',
+    tables: tabConnection?.schemas[0]?.tables ?? [],
+  };
+}
+
 export function findConnectionOrFallback(
   connections: DatabaseConnection[],
   id: string,

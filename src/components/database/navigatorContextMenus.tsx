@@ -1,12 +1,18 @@
 import React from 'react';
 import {
   DatabaseConnection,
+  DatabaseType,
   TableDefinition,
   ViewDefinition,
   ProcedureDefinition,
   ColumnDefinition,
 } from '../../types/database';
 import { ContextMenuItem } from '../dialogs/ContextMenu';
+import {
+  getConsoleActionLabel,
+  supportsErDiagram,
+} from '../../utils/connectionProfiles';
+import { isNetworkDatabaseType } from '../../utils/liveBridge';
 import {
   Table,
   Eye,
@@ -20,6 +26,7 @@ import {
   Trash2,
   Copy,
   Settings,
+  Download,
 } from 'lucide-react';
 
 export interface NavigatorMenuCallbacks {
@@ -203,8 +210,21 @@ export function buildColumnContextMenuItems(
 export function buildSchemaContextMenuItems(
   connId: string,
   schemaName: string,
-  cb: NavigatorMenuCallbacks
+  cb: NavigatorMenuCallbacks,
+  dbType: DatabaseType = 'sqlite'
 ): ContextMenuItem[] {
+  const consoleLabel = getConsoleActionLabel(dbType);
+  if (!supportsErDiagram(dbType)) {
+    return [
+      {
+        id: 'open_sql',
+        label: `Open ${consoleLabel}`,
+        icon: <FileCode className="w-3.5 h-3.5 text-amber-400" />,
+        action: () => cb.onOpenSqlEditor(connId),
+      },
+    ];
+  }
+
   return [
     {
       id: 'create_table',
@@ -214,7 +234,7 @@ export function buildSchemaContextMenuItems(
     },
     {
       id: 'open_sql',
-      label: 'Open New SQL Console',
+      label: `Open ${consoleLabel}`,
       icon: <FileCode className="w-3.5 h-3.5 text-amber-400" />,
       action: () => cb.onOpenSqlEditor(connId),
     },
@@ -232,25 +252,13 @@ export function buildConnectionContextMenuItems(
   canDelete: boolean,
   callbacks: {
     onEditConnection: (conn: DatabaseConnection) => void;
+    onRefreshConnection?: (connectionId: string) => void;
     onOpenSqlEditor: (connectionId: string) => void;
-    onOpenERDiagram: (connectionId: string) => void;
+    onExportSqlite?: () => void;
     onDeleteConnection: (connectionId: string) => void;
   }
 ): ContextMenuItem[] {
-  const deleteItems: ContextMenuItem[] = canDelete
-    ? [
-        { id: 'div_conn_del', isDivider: true, label: '' },
-        {
-          id: 'delete_connection',
-          label: 'Remove Connection',
-          icon: <Trash2 className="w-3.5 h-3.5 text-rose-400" />,
-          isDestructive: true,
-          action: () => callbacks.onDeleteConnection(conn.id),
-        },
-      ]
-    : [];
-
-  return [
+  const items: ContextMenuItem[] = [
     {
       id: 'edit_connection',
       label: 'Edit Connection Settings...',
@@ -258,17 +266,43 @@ export function buildConnectionContextMenuItems(
       action: () => callbacks.onEditConnection(conn),
     },
     {
-      id: 'conn_sql_console',
-      label: 'Open SQL Console',
+      id: 'conn_console',
+      label: `Open ${getConsoleActionLabel(conn.type)}`,
       icon: <Code2 className="w-3.5 h-3.5 text-amber-400" />,
       action: () => callbacks.onOpenSqlEditor(conn.id),
     },
-    {
-      id: 'conn_erd',
-      label: 'View ER Diagram',
-      icon: <LayoutGrid className="w-3.5 h-3.5 text-emerald-400" />,
-      action: () => callbacks.onOpenERDiagram(conn.id),
-    },
-    ...deleteItems,
   ];
+
+  if (isNetworkDatabaseType(conn.type) && callbacks.onRefreshConnection) {
+    items.push({
+      id: 'refresh_connection',
+      label: 'Refresh Schema',
+      icon: <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />,
+      action: () => callbacks.onRefreshConnection?.(conn.id),
+    });
+  }
+
+  if (conn.type === 'sqlite' && callbacks.onExportSqlite) {
+    items.push({
+      id: 'export_sqlite',
+      label: 'Export SQLite Database (.sqlite)',
+      icon: <Download className="w-3.5 h-3.5 text-purple-400" />,
+      action: () => callbacks.onExportSqlite?.(),
+    });
+  }
+
+  if (canDelete) {
+    items.push(
+      { id: 'div_conn_del', isDivider: true, label: '' },
+      {
+        id: 'delete_connection',
+        label: 'Remove Connection',
+        icon: <Trash2 className="w-3.5 h-3.5 text-rose-400" />,
+        isDestructive: true,
+        action: () => callbacks.onDeleteConnection(conn.id),
+      }
+    );
+  }
+
+  return items;
 }

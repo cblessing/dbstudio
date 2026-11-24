@@ -15,7 +15,8 @@ import { TableDetailsView } from './components/views/TableDetailsView';
 import { ERDiagramViewer } from './components/diagram/ERDiagramViewer';
 import { generateDropTableSql, generateTruncateTableSql, generateDropColumnSql } from './utils/tableManagement';
 import { downloadFile, formatSqlValue, postVsCodeMessage, quoteSqlIdentifier } from './utils/exportData';
-import { executeLiveQuery, deleteLiveConnection, isNetworkDatabaseType } from './utils/liveBridge';
+import { executeLiveQuery, isNetworkDatabaseType } from './utils/liveBridge';
+import { useConnectionActions } from './hooks/useConnectionActions';
 import {
   VsCodeViewMode,
   VsCodeEditorConfig,
@@ -25,19 +26,11 @@ import {
   getInitialConnections,
   getInitialConnectionId,
   findConnectionOrFallback,
+  resolveTabConnInfo,
   upsertConnectionList,
   useVsCodeHostSync,
   buildDestructiveConfirmConfig,
 } from './hooks/useVsCodeHostSync';
-
-function resolveTabConnInfo(tabConnection: DatabaseConnection | null) {
-  return {
-    id: tabConnection?.id ?? '',
-    name: tabConnection?.name ?? 'No Connection',
-    database: tabConnection?.database ?? '',
-    tables: tabConnection?.schemas[0]?.tables ?? [],
-  };
-}
 
 let nextTabId = 2;
 const createTabId = (prefix: string) => `${prefix}_${nextTabId++}`;
@@ -324,18 +317,20 @@ export default function App() {
     openTableTab(createTableConnectionId, tableDef.name);
   };
 
-  const handleDeleteConnection = (connId: string) => {
-    const target = connections.find((c) => c.id === connId);
-    if (target && isNetworkDatabaseType(target.type)) {
-      void deleteLiveConnection(connId).catch(() => {});
-    }
-    const next = connections.filter((c) => c.id !== connId);
-    setConnections(next);
-    broadcastConnectionsUpdate(next);
-    if (activeConnectionId === connId) {
-      setActiveConnectionId(next[0]?.id ?? '');
-    }
-  };
+  const {
+    isRefreshingConns,
+    handleDeleteConnection,
+    handleRefreshConnection,
+    handleRefreshAllConnections,
+    handleExportConnections,
+    handleImportConnections,
+  } = useConnectionActions({
+    connections,
+    activeConnectionId,
+    setConnections,
+    setActiveConnectionId,
+    broadcastConnectionsUpdate,
+  });
 
   const commands = buildWorkspaceCommands({
     onNewConnection: () => setConnectionModal({ open: true, editing: null }),
@@ -384,12 +379,17 @@ export default function App() {
     <DatabaseNavigator
       connections={connections}
       activeConnectionId={activeConnectionId}
+      isRefreshing={isRefreshingConns}
       onSelectConnection={setActiveConnectionId}
       onOpenTable={openTableTab}
       onOpenSqlEditor={openSqlEditorTab}
       onOpenERDiagram={openERDiagramTab}
       onOpenNewConnectionModal={() => setConnectionModal({ open: true, editing: null })}
       onEditConnection={(conn) => setConnectionModal({ open: true, editing: conn })}
+      onRefreshConnection={handleRefreshConnection}
+      onRefreshAllConnections={handleRefreshAllConnections}
+      onImportConnections={handleImportConnections}
+      onExportConnections={handleExportConnections}
       onDeleteConnection={handleDeleteConnection}
       onEditColumns={(connId, tbl) =>
         setEditingColumnsTable({ connectionId: connId, table: tbl })
