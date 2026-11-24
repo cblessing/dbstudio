@@ -197,40 +197,70 @@ const REDIS_STATEMENTS = [
   'SET order:1003 processing:79.50',
 ];
 
-const SEED_TARGETS = [
-  {
-    config: { id: 'seed_pg', type: 'postgres', host: '127.0.0.1', port: 5432, database: 'dbstudio', username: 'postgres', ssl: true, rejectUnauthorized: false },
-    statements: PG_STATEMENTS,
-  },
-  {
-    config: { id: 'seed_mysql', type: 'mysql', host: '127.0.0.1', port: 3306, database: 'dbstudio', username: 'root', ssl: true, rejectUnauthorized: false },
-    statements: MYSQL_STATEMENTS,
-  },
-  {
-    config: { id: 'seed_mariadb', type: 'mariadb', host: '127.0.0.1', port: 3307, database: 'dbstudio', username: 'root', ssl: true, rejectUnauthorized: false },
-    statements: MYSQL_STATEMENTS,
-  },
-  {
-    config: { id: 'seed_mssql', type: 'sqlserver', host: '127.0.0.1', port: 1433, database: 'master', username: 'sa', ssl: true, rejectUnauthorized: false },
-    statements: MSSQL_STATEMENTS,
-  },
-  {
-    config: { id: 'seed_oracle', type: 'oracle', host: '127.0.0.1', port: 1521, database: 'FREEPDB1', username: 'system', ssl: false, rejectUnauthorized: true },
-    statements: ORACLE_STATEMENTS,
-  },
-  {
-    config: { id: 'seed_ch', type: 'clickhouse', host: '127.0.0.1', port: 8123, database: 'dbstudio', username: 'default', ssl: true, rejectUnauthorized: false },
-    statements: CLICKHOUSE_STATEMENTS,
-  },
-  {
-    config: { id: 'seed_mongo', type: 'mongodb', host: '127.0.0.1', port: 27017, database: 'admin', username: 'root', ssl: true, rejectUnauthorized: false },
-    statements: MONGO_STATEMENTS,
-  },
-  {
-    config: { id: 'seed_redis', type: 'redis', host: '127.0.0.1', port: 6379, database: '0', username: '', ssl: true, rejectUnauthorized: false },
-    statements: REDIS_STATEMENTS,
-  },
-];
+function buildSeedTargets(pwd: string) {
+  const escapedOraclePwd = pwd.replace(/"/g, '');
+  return [
+    {
+      config: { id: 'seed_pg', type: 'postgres', host: '127.0.0.1', port: 5432, database: 'dbstudio', username: 'postgres', ssl: true, rejectUnauthorized: false },
+      statements: PG_STATEMENTS,
+    },
+    {
+      config: { id: 'seed_mysql', type: 'mysql', host: '127.0.0.1', port: 3306, database: 'dbstudio', username: 'root', ssl: true, rejectUnauthorized: false },
+      statements: MYSQL_STATEMENTS,
+    },
+    {
+      config: { id: 'seed_mariadb', type: 'mariadb', host: '127.0.0.1', port: 3307, database: 'dbstudio', username: 'root', ssl: true, rejectUnauthorized: false },
+      statements: MYSQL_STATEMENTS,
+    },
+    {
+      config: { id: 'seed_mssql_init', type: 'sqlserver', host: '127.0.0.1', port: 1433, database: 'master', username: 'sa', ssl: true, rejectUnauthorized: false },
+      statements: [
+        `IF DB_ID(N'dbstudio') IS NULL CREATE DATABASE [dbstudio]`,
+        `DROP TABLE IF EXISTS dbo.orders`,
+        `DROP TABLE IF EXISTS dbo.products`,
+        `DROP TABLE IF EXISTS dbo.customers`,
+      ],
+    },
+    {
+      config: { id: 'seed_mssql', type: 'sqlserver', host: '127.0.0.1', port: 1433, database: 'dbstudio', username: 'sa', ssl: true, rejectUnauthorized: false },
+      statements: MSSQL_STATEMENTS,
+    },
+    {
+      config: { id: 'seed_oracle_init', type: 'oracle', host: '127.0.0.1', port: 1521, database: 'FREEPDB1', username: 'system', ssl: false, rejectUnauthorized: true },
+      statements: [
+        `DECLARE v_cnt NUMBER; BEGIN SELECT COUNT(*) INTO v_cnt FROM dba_users WHERE username = 'DBSTUDIO'; IF v_cnt = 0 THEN EXECUTE IMMEDIATE 'CREATE USER dbstudio IDENTIFIED BY "${escapedOraclePwd}"'; END IF; EXECUTE IMMEDIATE 'GRANT UNLIMITED TABLESPACE, CREATE SESSION, CREATE TABLE, CREATE VIEW, CREATE PROCEDURE TO dbstudio'; END;`,
+        `DROP TABLE IF EXISTS system.orders`,
+        `DROP TABLE IF EXISTS system.products`,
+        `DROP TABLE IF EXISTS system.customers`,
+      ],
+    },
+    {
+      config: { id: 'seed_oracle', type: 'oracle', host: '127.0.0.1', port: 1521, database: 'FREEPDB1', username: 'dbstudio', ssl: false, rejectUnauthorized: true },
+      statements: ORACLE_STATEMENTS,
+    },
+    {
+      config: { id: 'seed_ch', type: 'clickhouse', host: '127.0.0.1', port: 8123, database: 'dbstudio', username: 'default', ssl: true, rejectUnauthorized: false },
+      statements: CLICKHOUSE_STATEMENTS,
+    },
+    {
+      config: { id: 'seed_mongo_cleanup', type: 'mongodb', host: '127.0.0.1', port: 27017, database: 'admin', username: 'root', ssl: true, rejectUnauthorized: false },
+      statements: [
+        JSON.stringify({ drop: 'orders' }),
+        JSON.stringify({ drop: 'products' }),
+        JSON.stringify({ drop: 'customers' }),
+      ],
+      ignoreErrors: true,
+    },
+    {
+      config: { id: 'seed_mongo', type: 'mongodb', host: '127.0.0.1', port: 27017, database: 'dbstudio', username: 'root', ssl: true, rejectUnauthorized: false },
+      statements: MONGO_STATEMENTS,
+    },
+    {
+      config: { id: 'seed_redis', type: 'redis', host: '127.0.0.1', port: 6379, database: '0', username: '', ssl: true, rejectUnauthorized: false },
+      statements: REDIS_STATEMENTS,
+    },
+  ];
+}
 
 async function main() {
   const pwd = loadPassword();
@@ -245,12 +275,12 @@ async function main() {
     },
   });
 
-  for (const target of SEED_TARGETS) {
+  for (const target of buildSeedTargets(pwd)) {
     await service.saveConnection(target.config, pwd);
     let failed: string | null = null;
     for (const stmt of target.statements) {
       const res = await service.executeQuery(target.config.id, stmt);
-      if (res.error) {
+      if (res.error && !target.ignoreErrors) {
         failed = res.error;
         break;
       }

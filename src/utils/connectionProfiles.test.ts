@@ -5,6 +5,7 @@ import {
   parseImportedConnectionProfiles,
   supportsErDiagram,
   getConsoleActionLabel,
+  groupTablesIntoSchemas,
 } from './connectionProfiles';
 import { DatabaseConnection } from '../types/database';
 
@@ -61,4 +62,30 @@ test('parseImportedConnectionProfiles skips invalid entries and throws on malfor
   assert.equal(imported[0].type, 'redis');
 
   assert.throws(() => parseImportedConnectionProfiles('{"invalid": true}'));
+});
+
+test('groupTablesIntoSchemas groups tables by schema, prioritizes default schema, and preserves views', () => {
+  const grouped = groupTablesIntoSchemas(
+    [
+      { name: 'invoices', schema: 'SALES', rowCount: 0, columns: [] },
+      { name: 'employees', schema: 'HR', rowCount: 0, columns: [] },
+      { name: 'audit_log', schema: 'SYSTEM', rowCount: 0, columns: [] },
+      { name: 'departments', schema: 'HR', rowCount: 0, columns: [] },
+    ],
+    'SYSTEM',
+    [{ name: 'HR', tables: [], views: [{ name: 'v_emp', definition: 'SELECT 1' }], procedures: [] }]
+  );
+
+  assert.deepEqual(
+    grouped.map((s) => s.name),
+    ['SYSTEM', 'HR', 'SALES']
+  );
+  assert.deepEqual(
+    grouped[1].tables.map((t) => t.name),
+    ['employees', 'departments']
+  );
+  assert.equal(grouped[1].views?.length, 1);
+
+  const empty = groupTablesIntoSchemas([], 'public');
+  assert.deepEqual(empty, [{ name: 'public', tables: [], views: [], procedures: [] }]);
 });

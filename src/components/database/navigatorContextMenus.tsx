@@ -20,6 +20,7 @@ import {
 import {
   Table,
   Eye,
+  EyeOff,
   Cpu,
   Plus,
   RefreshCw,
@@ -295,6 +296,39 @@ export function buildSchemaContextMenuItems(
       label: 'View Schema ER Diagram',
       icon: <LayoutGrid className="w-3.5 h-3.5 text-sky-400" />,
       action: () => cb.onOpenERDiagram(connId),
+    },
+  ];
+}
+
+export function buildTablesGroupContextMenuItems(
+  connId: string,
+  schemaName: string,
+  cb: NavigatorMenuCallbacks,
+  dbType: DatabaseType = 'sqlite',
+  oracleOptions?: {
+    showOracleMaintained: boolean;
+    onToggleOracleMaintained: () => void;
+  }
+): ContextMenuItem[] {
+  const items = buildSchemaContextMenuItems(connId, schemaName, cb, dbType);
+  if (dbType !== 'oracle' || !oracleOptions) {
+    return items;
+  }
+
+  return [
+    ...items,
+    { id: 'div_oracle_sys', isDivider: true, label: '' },
+    {
+      id: 'toggle_oracle_maintained',
+      label: oracleOptions.showOracleMaintained
+        ? 'Hide Oracle-Maintained Tables'
+        : 'Show Oracle-Maintained Tables',
+      icon: oracleOptions.showOracleMaintained ? (
+        <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
+      ) : (
+        <Eye className="w-3.5 h-3.5 text-sky-400" />
+      ),
+      action: oracleOptions.onToggleOracleMaintained,
     },
   ];
 }

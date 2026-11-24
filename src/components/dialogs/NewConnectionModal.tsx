@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { DatabaseDriverInfo, DatabaseConnection, DatabaseType } from '../../types/database';
 import { DATABASE_DRIVERS } from '../../engine/sqlEngineCore';
+import { groupTablesIntoSchemas } from '../../utils/connectionProfiles';
 import {
   isNetworkDatabaseType,
   testLiveConnection,
@@ -146,8 +147,8 @@ async function persistLiveConnectionAndSchema(
 ): Promise<DatabaseConnection['schemas']> {
   await saveLiveConnection(payload, password);
   const liveTables = await introspectLiveSchema(connId).catch(() => []);
-  const schemaName = liveTables[0]?.schema ?? defaultSchemaNameFor(payload.type, payload.database);
-  return [{ name: schemaName, tables: liveTables, views: [], procedures: [] }];
+  const fallbackName = defaultSchemaNameFor(payload.type, payload.database);
+  return groupTablesIntoSchemas(liveTables, fallbackName);
 }
 
 function mergeParsedUriIntoForm(

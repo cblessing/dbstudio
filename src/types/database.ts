@@ -51,6 +51,7 @@ export interface TableDefinition {
     foreignColumn: string;
   }[];
   ddl?: string;
+  system?: boolean;
 }
 
 export interface ViewDefinition {

@@ -278,11 +278,22 @@ function ViewTreeItem({
   );
 }
 
+function filterVisibleTables(
+  tables: TableDefinition[],
+  showSystemTables: boolean,
+  searchTerm: string
+): TableDefinition[] {
+  return tables.filter(
+    (t) => (showSystemTables || !t.system) && matchesSearchFilter(searchTerm, t.name, t.columns)
+  );
+}
+
 export function SchemaObjectGroups({
   connId,
   schema,
   schemaKey,
   searchTerm,
+  showSystemTables = true,
   expandedObjectGroups,
   expandedTables,
   expandedViews,
@@ -293,7 +304,7 @@ export function SchemaObjectGroups({
   onOpenSqlEditor,
   onEditColumns,
   onDropTableClick,
-  onSchemaContextMenu,
+  onTablesGroupContextMenu,
   onViewsGroupContextMenu,
   onProceduresGroupContextMenu,
   onTableContextMenu,
@@ -305,6 +316,7 @@ export function SchemaObjectGroups({
   schema: SchemaDefinition;
   schemaKey: string;
   searchTerm: string;
+  showSystemTables?: boolean;
   expandedObjectGroups: Record<string, boolean>;
   expandedTables: Record<string, boolean>;
   expandedViews: Record<string, boolean>;
@@ -315,7 +327,7 @@ export function SchemaObjectGroups({
   onOpenSqlEditor: (connId: string, query?: string) => void;
   onEditColumns: (connId: string, table: TableDefinition) => void;
   onDropTableClick: (connId: string, tableName: string) => void;
-  onSchemaContextMenu: (e: React.MouseEvent, connId: string, schemaName: string) => void;
+  onTablesGroupContextMenu: (e: React.MouseEvent, connId: string, schemaName: string) => void;
   onViewsGroupContextMenu: (e: React.MouseEvent, connId: string, schemaName: string) => void;
   onProceduresGroupContextMenu: (e: React.MouseEvent, connId: string, schemaName: string) => void;
   onTableContextMenu: (e: React.MouseEvent, connId: string, tbl: TableDefinition) => void;
@@ -332,9 +344,7 @@ export function SchemaObjectGroups({
     col: ColumnDefinition
   ) => void;
 }) {
-  const filteredTables = schema.tables.filter((t) =>
-    matchesSearchFilter(searchTerm, t.name, t.columns)
-  );
+  const filteredTables = filterVisibleTables(schema.tables, showSystemTables, searchTerm);
   const viewsList = schema.views ?? [];
   const filteredViews = viewsList.filter((v) =>
     matchesSearchFilter(searchTerm, v.name, v.columns)
@@ -369,7 +379,7 @@ export function SchemaObjectGroups({
           folderColorClass="text-blue-400"
           title="Tables (Right-click to create table or view ER diagram)"
           onToggle={() => onToggleObjectGroup(tablesGroupKey, true)}
-          onContextMenu={(e) => onSchemaContextMenu(e, connId, schema.name)}
+          onContextMenu={(e) => onTablesGroupContextMenu(e, connId, schema.name)}
         />
 
         {isTablesExpanded && (

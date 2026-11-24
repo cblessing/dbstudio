@@ -16,6 +16,7 @@ import {
   buildProceduresGroupContextMenuItems,
   buildColumnContextMenuItems,
   buildSchemaContextMenuItems,
+  buildTablesGroupContextMenuItems,
   NavigatorMenuCallbacks,
 } from './navigatorContextMenus';
 import { SchemaObjectGroups } from './NavigatorTreeNodes';
@@ -72,6 +73,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
   const [expandedObjectGroups, setExpandedObjectGroups] = useState<Record<string, boolean>>({});
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
   const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>({});
+  const [showOracleMaintained, setShowOracleMaintained] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -150,6 +152,15 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
 
   const handleSchemaContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
     openContextMenu(e, buildSchemaContextMenuItems(connId, schemaName, menuCallbacks, getConnDialect(connId)));
+
+  const handleTablesGroupContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
+    openContextMenu(
+      e,
+      buildTablesGroupContextMenuItems(connId, schemaName, menuCallbacks, getConnDialect(connId), {
+        showOracleMaintained,
+        onToggleOracleMaintained: () => setShowOracleMaintained((prev) => !prev),
+      })
+    );
 
   const handleConnectionContextMenu = (e: React.MouseEvent, conn: DatabaseConnection) =>
     openContextMenu(
@@ -267,6 +278,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
                               schema={schema}
                               schemaKey={schemaKey}
                               searchTerm={searchTerm}
+                              showSystemTables={conn.type === 'oracle' ? showOracleMaintained : true}
                               expandedObjectGroups={expandedObjectGroups}
                               expandedTables={expandedTables}
                               expandedViews={expandedViews}
@@ -277,7 +289,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
                               onOpenSqlEditor={onOpenSqlEditor}
                               onEditColumns={onEditColumns}
                               onDropTableClick={onDropTableClick}
-                              onSchemaContextMenu={handleSchemaContextMenu}
+                              onTablesGroupContextMenu={handleTablesGroupContextMenu}
                               onViewsGroupContextMenu={handleViewsGroupContextMenu}
                               onProceduresGroupContextMenu={handleProceduresGroupContextMenu}
                               onTableContextMenu={handleTableContextMenu}

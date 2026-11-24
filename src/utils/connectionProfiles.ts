@@ -1,4 +1,9 @@
-import { DatabaseConnection, DatabaseType } from '../types/database';
+import {
+  DatabaseConnection,
+  DatabaseType,
+  SchemaDefinition,
+  TableDefinition,
+} from '../types/database';
 import { DATABASE_DRIVERS } from '../engine/sqlEngineCore';
 import {
   introspectLiveSchema,
@@ -105,17 +110,52 @@ export function parseImportedConnectionProfiles(rawJson: string): DatabaseConnec
     .filter((conn): conn is DatabaseConnection => conn !== null);
 }
 
+export function groupTablesIntoSchemas(
+  tables: TableDefinition[],
+  fallbackSchemaName: string,
+  existingSchemas?: SchemaDefinition[]
+): SchemaDefinition[] {
+  if (tables.length === 0) {
+    return [{ name: fallbackSchemaName, tables: [], views: [], procedures: [] }];
+  }
+
+  const bySchema = new Map<string, TableDefinition[]>();
+  for (const tbl of tables) {
+    const name = tbl.schema?.trim() || fallbackSchemaName;
+    const list = bySchema.get(name) ?? [];
+    list.push(tbl);
+    bySchema.set(name, list);
+  }
+
+  const existingByName = new Map((existingSchemas ?? []).map((s) => [s.name, s]));
+  const sortedNames = Array.from(bySchema.keys()).sort((a, b) => {
+    if (a === fallbackSchemaName) return -1;
+    if (b === fallbackSchemaName) return 1;
+    return a.localeCompare(b);
+  });
+
+  return sortedNames.map((name) => {
+    const prev = existingByName.get(name);
+    return {
+      name,
+      tables: bySchema.get(name) ?? [],
+      views: prev?.views ?? [],
+      procedures: prev?.procedures ?? [],
+    };
+  });
+}
+
 export async function refreshLiveConnectionSchema(
   conn: DatabaseConnection
 ): Promise<DatabaseConnection | null> {
   if (!isNetworkDatabaseType(conn.type)) return null;
   const liveTables = await introspectLiveSchema(conn.id).catch(() => null);
   if (!liveTables) return null;
-  const schemaName = liveTables[0]?.schema ?? conn.schemas[0]?.name ?? 'public';
+  const fallbackName = conn.schemas[0]?.name ?? defaultSchemaName(conn.type);
   return {
     ...conn,
     status: 'connected',
-    schemas: [{ name: schemaName, tables: liveTables, views: [], procedures: [] }],
+    schemas: groupTablesIntoSchemas(liveTables, fallbackName, conn.schemas),
   };
 }
 

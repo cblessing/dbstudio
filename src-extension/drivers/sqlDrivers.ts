@@ -19,25 +19,43 @@ import {
   parseTextExplainLines,
 } from './explainParser';
 
-function groupSchemaRows(
-  rows: Array<{ table_name: string; column_name: string; data_type: string; is_nullable?: string }>,
-  schemaName?: string
-): LiveSchemaTable[] {
+interface RawSchemaColumnRow {
+  table_schema?: string;
+  table_name: string;
+  column_name: string;
+  data_type: string;
+  is_nullable?: string;
+  is_system?: boolean;
+}
+
+function toLiveSchemaColumn(r: RawSchemaColumnRow) {
+  return {
+    name: String(r.column_name ?? ''),
+    type: String(r.data_type ?? 'TEXT'),
+    nullable: String(r.is_nullable ?? 'YES').toUpperCase() !== 'NO',
+    primaryKey: false,
+  };
+}
+
+function groupSchemaRows(rows: RawSchemaColumnRow[], defaultSchemaName?: string): LiveSchemaTable[] {
   const byTable = new Map<string, LiveSchemaTable>();
   for (const r of rows) {
     const tableName = String(r.table_name ?? '');
     if (!tableName) continue;
-    let tbl = byTable.get(tableName);
+    const schemaName = String(r.table_schema ?? defaultSchemaName ?? '');
+    const key = `${schemaName}.${tableName}`;
+    let tbl = byTable.get(key);
     if (!tbl) {
-      tbl = { name: tableName, schema: schemaName, rowCount: 0, columns: [] };
-      byTable.set(tableName, tbl);
+      tbl = {
+        name: tableName,
+        schema: schemaName || undefined,
+        rowCount: 0,
+        columns: [],
+        ...(r.is_system ? { system: true } : {}),
+      };
+      byTable.set(key, tbl);
     }
-    tbl.columns.push({
-      name: String(r.column_name ?? ''),
-      type: String(r.data_type ?? 'TEXT'),
-      nullable: String(r.is_nullable ?? 'YES').toUpperCase() !== 'NO',
-      primaryKey: false,
-    });
+    tbl.columns.push(toLiveSchemaColumn(r));
   }
   return Array.from(byTable.values());
 }
@@ -174,10 +192,12 @@ export const postgresDriver: LiveDatabaseDriver = {
   async introspectSchema(config, password): Promise<LiveSchemaTable[]> {
     return withPgClient(config, password, async (client) => {
       const res = await client.query(
-        `SELECT table_name, column_name, data_type, is_nullable
+        `SELECT table_schema, table_name, column_name, data_type, is_nullable
          FROM information_schema.columns
-         WHERE table_schema = 'public'
-         ORDER BY table_name, ordinal_position`
+         WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+           AND table_schema NOT LIKE 'pg_toast%'
+           AND table_schema NOT LIKE 'pg_temp_%'
+         ORDER BY table_schema, table_name, ordinal_position`
       );
       return groupSchemaRows(res.rows ?? [], 'public');
     });
@@ -313,10 +333,10 @@ export const sqlServerDriver: LiveDatabaseDriver = {
   async introspectSchema(config, password): Promise<LiveSchemaTable[]> {
     return withSqlServerPool(config, password, async (pool) => {
       const res = await pool.request().query(
-        `SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, DATA_TYPE AS data_type, IS_NULLABLE AS is_nullable
+        `SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name, COLUMN_NAME AS column_name, DATA_TYPE AS data_type, IS_NULLABLE AS is_nullable
          FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = 'dbo'
-         ORDER BY TABLE_NAME, ORDINAL_POSITION`
+         WHERE TABLE_SCHEMA NOT IN ('sys', 'INFORMATION_SCHEMA', 'guest')
+         ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION`
       );
       return groupSchemaRows(res.recordset ?? [], 'dbo');
     });
@@ -378,17 +398,22 @@ export const oracleDriver: LiveDatabaseDriver = {
   async introspectSchema(config, password): Promise<LiveSchemaTable[]> {
     return withOracleConn(config, password, async (conn, oracledb) => {
       const res = await conn.execute(
-        `SELECT table_name, column_name, data_type, nullable AS is_nullable
-         FROM user_tab_columns
-         ORDER BY table_name, column_id`,
+        `SELECT c.owner AS table_schema, c.table_name, c.column_name, c.data_type, c.nullable AS is_nullable, o.oracle_maintained
+         FROM all_tab_columns c
+         JOIN all_users u ON u.username = c.owner
+         JOIN all_objects o ON o.owner = c.owner AND o.object_name = c.table_name AND o.object_type = 'TABLE'
+         WHERE u.oracle_maintained = 'N' OR c.owner = USER
+         ORDER BY c.owner, c.table_name, c.column_id`,
         [],
         { outFormat: oracledb.OUT_FORMAT_OBJECT }
       );
       const normalized = (res.rows ?? []).map((r: any) => ({
+        table_schema: r.TABLE_SCHEMA,
         table_name: r.TABLE_NAME,
         column_name: r.COLUMN_NAME,
         data_type: r.DATA_TYPE,
         is_nullable: r.IS_NULLABLE === 'N' ? 'NO' : 'YES',
+        is_system: r.ORACLE_MAINTAINED === 'Y',
       }));
       return groupSchemaRows(normalized, config.username.toUpperCase() || 'USER');
     });

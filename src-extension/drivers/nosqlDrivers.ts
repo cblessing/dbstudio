@@ -24,6 +24,7 @@ async function withMongoClient<T>(
   const { MongoClient } = loadOptionalDriver('mongodb');
   const client = new MongoClient(buildMongoUri(config, password), {
     serverSelectionTimeoutMS: config.timeoutMs ?? 10000,
+    authSource: config.username ? 'admin' : undefined,
     tls: config.ssl,
     tlsAllowInvalidCertificates: config.ssl && !config.rejectUnauthorized,
   });
@@ -60,12 +61,14 @@ export const mongodbDriver: LiveDatabaseDriver = {
   async introspectSchema(config, password): Promise<LiveSchemaTable[]> {
     return withMongoClient(config, password, async (db) => {
       const collections = await db.listCollections().toArray();
-      return collections.map((col: any) => ({
-        name: String(col.name),
-        schema: config.database || 'admin',
-        rowCount: 0,
-        columns: [{ name: '_id', type: 'ObjectId', nullable: false, primaryKey: true }],
-      }));
+      return collections
+        .filter((col: any) => !String(col.name).startsWith('system.'))
+        .map((col: any) => ({
+          name: String(col.name),
+          schema: config.database || 'admin',
+          rowCount: 0,
+          columns: [{ name: '_id', type: 'ObjectId', nullable: false, primaryKey: true }],
+        }));
     });
   },
 };

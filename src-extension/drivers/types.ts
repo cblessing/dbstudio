@@ -68,6 +68,7 @@ export interface LiveSchemaTable {
   schema?: string;
   rowCount: number;
   columns: LiveSchemaColumn[];
+  system?: boolean;
 }
 
 export interface LiveDatabaseDriver {
