@@ -8,6 +8,7 @@ import {
 } from '../../types/database';
 import { ContextMenu, ContextMenuItem } from '../dialogs/ContextMenu';
 import {
+  buildConnectionContextMenuItems,
   buildTableContextMenuItems,
   buildViewContextMenuItems,
   buildProcedureContextMenuItems,
@@ -33,6 +34,7 @@ interface DatabaseNavigatorProps extends NavigatorMenuCallbacks {
   activeConnectionId: string;
   onSelectConnection: (id: string) => void;
   onOpenNewConnectionModal: () => void;
+  onEditConnection: (conn: DatabaseConnection) => void;
   onDeleteConnection: (id: string) => void;
   onExportDatabase?: () => void;
 }
@@ -43,6 +45,7 @@ function ConnectionTreeHeader({
   isActive,
   canDelete,
   onToggleConnection,
+  onContextMenu,
   onOpenSqlEditor,
   onOpenERDiagram,
   onDeleteConnection,
@@ -52,6 +55,7 @@ function ConnectionTreeHeader({
   isActive: boolean;
   canDelete: boolean;
   onToggleConnection: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
   onOpenSqlEditor: () => void;
   onOpenERDiagram: () => void;
   onDeleteConnection: () => void;
@@ -62,6 +66,8 @@ function ConnectionTreeHeader({
         isActive ? 'bg-[#37373d] text-white font-medium' : 'text-[#cccccc]'
       }`}
       onClick={onToggleConnection}
+      onContextMenu={onContextMenu}
+      title="Right-click to edit connection settings"
     >
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
         <span className="text-[#858585] group-hover:text-white">
@@ -146,6 +152,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
   onOpenSqlEditor,
   onOpenERDiagram,
   onOpenNewConnectionModal,
+  onEditConnection,
   onDeleteConnection,
   onEditColumns,
   onCreateTableClick,
@@ -231,6 +238,17 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
 
   const handleSchemaContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
     openContextMenu(e, buildSchemaContextMenuItems(connId, schemaName, menuCallbacks));
+
+  const handleConnectionContextMenu = (e: React.MouseEvent, conn: DatabaseConnection) =>
+    openContextMenu(
+      e,
+      buildConnectionContextMenuItems(conn, connections.length > 1, {
+        onEditConnection,
+        onOpenSqlEditor,
+        onOpenERDiagram,
+        onDeleteConnection,
+      })
+    );
 
   const activeConn = connections.find((c) => c.id === activeConnectionId) ?? connections[0];
   const defaultActiveId = activeConn ? activeConn.id : 'conn_sqlite_local';
@@ -320,6 +338,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
                 isActive={isActive}
                 canDelete={connections.length > 1}
                 onToggleConnection={() => toggleConnection(conn.id)}
+                onContextMenu={(e) => handleConnectionContextMenu(e, conn)}
                 onOpenSqlEditor={() => onOpenSqlEditor(conn.id)}
                 onOpenERDiagram={() => onOpenERDiagram(conn.id)}
                 onDeleteConnection={() => onDeleteConnection(conn.id)}

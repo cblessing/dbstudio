@@ -86,6 +86,15 @@ export function getInitialConnectionId(
   return config?.connectionId ? config.connectionId : conns[0].id;
 }
 
+export function upsertConnectionList(
+  prev: DatabaseConnection[],
+  savedConn: DatabaseConnection
+): DatabaseConnection[] {
+  return prev.some((c) => c.id === savedConn.id)
+    ? prev.map((c) => (c.id === savedConn.id ? savedConn : c))
+    : [savedConn, ...prev];
+}
+
 export function findConnectionOrFallback(
   connections: DatabaseConnection[],
   id: string,

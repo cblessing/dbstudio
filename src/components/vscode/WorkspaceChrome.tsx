@@ -236,6 +236,7 @@ export function buildWorkspaceCommands({
 
 export function WorkspaceModals({
   isNewConnectionOpen,
+  editingConnection,
   onCloseNewConnection,
   onAddConnection,
   isCommandPaletteOpen,
@@ -253,6 +254,7 @@ export function WorkspaceModals({
   onCloseConfirmModal,
 }: {
   isNewConnectionOpen: boolean;
+  editingConnection?: DatabaseConnection | null;
   onCloseNewConnection: () => void;
   onAddConnection: (newConn: DatabaseConnection) => void;
   isCommandPaletteOpen: boolean;
@@ -277,6 +279,7 @@ export function WorkspaceModals({
     <>
       <NewConnectionModal
         isOpen={isNewConnectionOpen}
+        editingConnection={editingConnection}
         onClose={onCloseNewConnection}
         onAddConnection={onAddConnection}
       />

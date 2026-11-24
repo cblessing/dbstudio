@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  DatabaseConnection,
   TableDefinition,
   ViewDefinition,
   ProcedureDefinition,
@@ -18,6 +19,7 @@ import {
   Code2,
   Trash2,
   Copy,
+  Settings,
 } from 'lucide-react';
 
 export interface NavigatorMenuCallbacks {
@@ -222,5 +224,51 @@ export function buildSchemaContextMenuItems(
       icon: <LayoutGrid className="w-3.5 h-3.5 text-sky-400" />,
       action: () => cb.onOpenERDiagram(connId),
     },
+  ];
+}
+
+export function buildConnectionContextMenuItems(
+  conn: DatabaseConnection,
+  canDelete: boolean,
+  callbacks: {
+    onEditConnection: (conn: DatabaseConnection) => void;
+    onOpenSqlEditor: (connectionId: string) => void;
+    onOpenERDiagram: (connectionId: string) => void;
+    onDeleteConnection: (connectionId: string) => void;
+  }
+): ContextMenuItem[] {
+  const deleteItems: ContextMenuItem[] = canDelete
+    ? [
+        { id: 'div_conn_del', isDivider: true, label: '' },
+        {
+          id: 'delete_connection',
+          label: 'Remove Connection',
+          icon: <Trash2 className="w-3.5 h-3.5 text-rose-400" />,
+          isDestructive: true,
+          action: () => callbacks.onDeleteConnection(conn.id),
+        },
+      ]
+    : [];
+
+  return [
+    {
+      id: 'edit_connection',
+      label: 'Edit Connection Settings...',
+      icon: <Settings className="w-3.5 h-3.5 text-sky-400" />,
+      action: () => callbacks.onEditConnection(conn),
+    },
+    {
+      id: 'conn_sql_console',
+      label: 'Open SQL Console',
+      icon: <Code2 className="w-3.5 h-3.5 text-amber-400" />,
+      action: () => callbacks.onOpenSqlEditor(conn.id),
+    },
+    {
+      id: 'conn_erd',
+      label: 'View ER Diagram',
+      icon: <LayoutGrid className="w-3.5 h-3.5 text-emerald-400" />,
+      action: () => callbacks.onOpenERDiagram(conn.id),
+    },
+    ...deleteItems,
   ];
 }

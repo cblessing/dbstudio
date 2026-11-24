@@ -43,6 +43,7 @@ import {
   getInitialConnections,
   getInitialConnectionId,
   findConnectionOrFallback,
+  upsertConnectionList,
   useVsCodeHostSync,
   buildDestructiveConfirmConfig,
 } from './hooks/useVsCodeHostSync';
@@ -61,7 +62,7 @@ export default function App() {
   );
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isNewConnectionOpen, setIsNewConnectionOpen] = useState(false);
+  const [connectionModal, setConnectionModal] = useState<{ open: boolean; editing: DatabaseConnection | null }>({ open: false, editing: null });
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(false);
   const [editingColumnsTable, setEditingColumnsTable] = useState<{
     connectionId: string;
@@ -343,7 +344,7 @@ export default function App() {
   };
 
   const commands = buildWorkspaceCommands({
-    onNewConnection: () => setIsNewConnectionOpen(true),
+    onNewConnection: () => setConnectionModal({ open: true, editing: null }),
     onNewQuery: () => openSqlEditorTab(activeConnectionId),
     onOpenErd: () => openERDiagramTab(activeConnectionId),
     onExportDatabase: handleDownloadDatabase,
@@ -354,18 +355,21 @@ export default function App() {
   const currentTableDef = resolveCurrentTableDefinition(tabConnection, activeTab.tableName);
   const editingDialect = editingColumnsTable ? getConnectionDialect(editingColumnsTable.connectionId) : 'sqlite';
 
+  const handleUpsertConnection = (savedConn: DatabaseConnection) => {
+    setConnections((prev) => {
+      const next = upsertConnectionList(prev, savedConn);
+      broadcastConnectionsUpdate(next);
+      return next;
+    });
+    setActiveConnectionId(savedConn.id);
+  };
+
   const renderModals = () => (
     <WorkspaceModals
-      isNewConnectionOpen={isNewConnectionOpen}
-      onCloseNewConnection={() => setIsNewConnectionOpen(false)}
-      onAddConnection={(newConn) => {
-        setConnections((prev) => {
-          const next = [newConn, ...prev];
-          broadcastConnectionsUpdate(next);
-          return next;
-        });
-        setActiveConnectionId(newConn.id);
-      }}
+      isNewConnectionOpen={connectionModal.open}
+      editingConnection={connectionModal.editing}
+      onCloseNewConnection={() => setConnectionModal({ open: false, editing: null })}
+      onAddConnection={handleUpsertConnection}
       isCommandPaletteOpen={isCommandPaletteOpen}
       onCloseCommandPalette={() => setIsCommandPaletteOpen(false)}
       commands={commands}
@@ -390,7 +394,8 @@ export default function App() {
       onOpenTable={openTableTab}
       onOpenSqlEditor={openSqlEditorTab}
       onOpenERDiagram={openERDiagramTab}
-      onOpenNewConnectionModal={() => setIsNewConnectionOpen(true)}
+      onOpenNewConnectionModal={() => setConnectionModal({ open: true, editing: null })}
+      onEditConnection={(conn) => setConnectionModal({ open: true, editing: conn })}
       onDeleteConnection={handleDeleteConnection}
       onEditColumns={(connId, tbl) =>
         setEditingColumnsTable({ connectionId: connId, table: tbl })
@@ -446,17 +451,14 @@ export default function App() {
   if (viewMode === 'sidebar') {
     return (
       <div className="flex flex-col h-screen w-screen bg-[#252526] text-[#cccccc] font-sans overflow-hidden select-none">
-        {renderDatabaseNavigator()}
-        {renderModals()}
+        {renderDatabaseNavigator()}{renderModals()}
       </div>
     );
   }
-
   if (viewMode === 'editor') {
     return (
       <div className="flex flex-col h-screen w-screen bg-[#1e1e1e] text-[#cccccc] font-sans overflow-hidden select-none">
-        <main className="flex-1 min-h-0 relative flex flex-col" role="main">{renderActiveEditorContent()}</main>
-        {renderModals()}
+        <main className="flex-1 min-h-0 relative flex flex-col" role="main">{renderActiveEditorContent()}</main>{renderModals()}
       </div>
     );
   }
@@ -489,7 +491,7 @@ export default function App() {
       <StatusBar
         activeConnection={activeConnection}
         executionStats={executionStats}
-        onOpenNewConnection={() => setIsNewConnectionOpen(true)}
+        onOpenNewConnection={() => setConnectionModal({ open: true, editing: null })}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
       {renderModals()}
