@@ -1,3 +1,4 @@
+import * as https from 'https';
 import {
   LiveConnectionConfig,
   LiveDatabaseDriver,
@@ -289,6 +290,10 @@ function createClickHouseClient(config: LiveConnectionConfig, password: string):
     password,
     database: config.database || 'default',
     request_timeout: config.timeoutMs ?? 10000,
+    http_agent:
+      config.ssl && !config.rejectUnauthorized
+        ? new https.Agent({ rejectUnauthorized: false })
+        : undefined,
   });
 }
 

@@ -103,7 +103,7 @@
   "scripts": {
     "dev": "vite --port=3000 --host=127.0.0.1",
     "build:client": "vite build",
-    "build:extension": "tsc -p tsconfig.extension.json && node -e \"fs.writeFileSync('out/package.json', JSON.stringify({ type: 'commonjs' }, null, 2))\"",
+    "build:extension": "tsc -p tsconfig.extension.json --noEmit && node scripts/build-extension.mjs",
     "build": "vite build && npm run build:extension",
     "preview": "vite preview",
     "clean": "node -e \"['dist', 'out'].forEach(d => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) {} })\"",

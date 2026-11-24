@@ -5,6 +5,8 @@ import * as crypto from 'crypto';
 import { LiveConnectionService, SecretStoreLike } from './drivers/connectionService';
 import { tryHandleLiveRpcMessage } from './drivers/rpcHandler';
 
+export { LiveConnectionService };
+
 interface EditorTabConfig {
   editorType: 'query' | 'erd' | 'table';
   connectionId?: string;

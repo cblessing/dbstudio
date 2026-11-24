@@ -147,12 +147,31 @@ export function validateConnectionConfig(
   };
 }
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+const STATIC_DRIVER_LOADERS: Record<string, () => unknown> = {
+  pg: () => require('pg'),
+  'mysql2/promise': () => require('mysql2/promise'),
+  mssql: () => require('mssql'),
+  oracledb: () => require('oracledb'),
+  '@clickhouse/client': () => require('@clickhouse/client'),
+  mongodb: () => require('mongodb'),
+  ioredis: () => require('ioredis'),
+};
+/* eslint-enable @typescript-eslint/no-require-imports */
+
 export function loadOptionalDriver<T = any>(packageName: string): T {
+  const loader = STATIC_DRIVER_LOADERS[packageName];
+  if (!loader) {
+    throw new Error(`Unsupported driver package "${packageName}".`);
+  }
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require(packageName) as T;
-  } catch {
-    throw new Error(`Driver package "${packageName}" is not installed. Run "npm install ${packageName}".`);
+    return loader() as T;
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Driver package "${packageName}" could not be loaded: ${detail}`,
+      { cause: err }
+    );
   }
 }
 

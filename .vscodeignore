@@ -18,6 +18,9 @@ index.html
 !public/icon.png
 *.log
 .env*
+.certs/**
 bun.lock
 AGENTS.md
 eslint.config.js
+compose.yaml
+out/**/*.map

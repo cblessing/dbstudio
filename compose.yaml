@@ -1,0 +1,84 @@
+# Local development database instances for Database Studio (Podman / Compose)
+# Configure local passwords in .env (see .env.example). All ports bind to 127.0.0.1 only.
+
+services:
+  postgres:
+    image: docker.io/library/postgres:17
+    container_name: dbstudio-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_DEV_PASSWORD:?Set DB_DEV_PASSWORD in .env}
+      POSTGRES_DB: dbstudio
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+
+  mysql:
+    image: docker.io/library/mysql:8.4
+    container_name: dbstudio-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_DEV_PASSWORD:?Set DB_DEV_PASSWORD in .env}
+      MYSQL_DATABASE: dbstudio
+    ports:
+      - "127.0.0.1:3306:3306"
+    restart: unless-stopped
+
+  mariadb:
+    image: docker.io/library/mariadb:11
+    container_name: dbstudio-mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_DEV_PASSWORD:?Set DB_DEV_PASSWORD in .env}
+      MARIADB_DATABASE: dbstudio
+    ports:
+      - "127.0.0.1:3307:3306"
+    restart: unless-stopped
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: dbstudio-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${DB_DEV_PASSWORD:?Set DB_DEV_PASSWORD in .env}
+      MSSQL_PID: Developer
+    ports:
+      - "127.0.0.1:1433:1433"
+    restart: unless-stopped
+
+  oracle:
+    image: container-registry.oracle.com/database/free:latest-lite
+    container_name: dbstudio-oracle
+    environment:
+      ORACLE_PWD: ${DB_DEV_PASSWORD:?Set DB_DEV_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:1521:1521"
+    restart: unless-stopped
+
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:latest
+    container_name: dbstudio-clickhouse
+    environment:
+      CLICKHOUSE_DB: dbstudio
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${DB_DEV_PASSWORD:?Set DB_DEV_PASSWORD in .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "127.0.0.1:8123:8123"
+    restart: unless-stopped
+
+  mongodb:
+    image: docker.io/library/mongo:8
+    container_name: dbstudio-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_DEV_PASSWORD:?Set DB_DEV_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:27017:27017"
+    restart: unless-stopped
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    container_name: dbstudio-redis
+    command: ["redis-server", "--requirepass", "${DB_DEV_PASSWORD:?Set DB_DEV_PASSWORD in .env}"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
