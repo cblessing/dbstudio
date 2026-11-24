@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseConnectionUri } from './connectionUri';
+import { buildConnectionUri, parseConnectionUri } from './connectionUri';
 
 test('parseConnectionUri parses PostgreSQL URI with credentials and sslmode', () => {
   const res = parseConnectionUri('postgresql://postgres:secret%21@127.0.0.1:5432/dbstudio?sslmode=require&rejectUnauthorized=false');
@@ -33,6 +33,39 @@ test('parseConnectionUri detects rediss and mongodb+srv TLS defaults', () => {
     assert.equal(mongoRes.value.ssl, true);
     assert.equal(mongoRes.value.database, 'admin');
   }
+});
+
+test('parseConnectionUri ignores masked ****** credentials so editing host/port preserves them', () => {
+  const res = parseConnectionUri('postgresql://******:******@10.0.0.5:5433/prod');
+  assert.equal(res.ok, true);
+  if (res.ok) {
+    assert.equal(res.value.host, '10.0.0.5');
+    assert.equal(res.value.port, 5433);
+    assert.equal(res.value.database, 'prod');
+    assert.equal(res.value.username, undefined);
+    assert.equal(res.value.password, undefined);
+  }
+});
+
+test('buildConnectionUri formats masked and unmasked URIs accurately', () => {
+  const input = {
+    type: 'postgres' as const,
+    host: '127.0.0.1',
+    port: 5432,
+    database: 'dbstudio',
+    username: 'postgres',
+    password: 'p@ss!word',
+    ssl: true,
+    allowSelfSigned: true,
+  };
+  assert.equal(
+    buildConnectionUri(input, true),
+    'postgresql://******:******@127.0.0.1:5432/dbstudio?sslmode=require&rejectUnauthorized=false'
+  );
+  assert.equal(
+    buildConnectionUri(input, false),
+    'postgresql://postgres:p%40ss!word@127.0.0.1:5432/dbstudio?sslmode=require&rejectUnauthorized=false'
+  );
 });
 
 test('parseConnectionUri rejects empty and malformed URIs', () => {

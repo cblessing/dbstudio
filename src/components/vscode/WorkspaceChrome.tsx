@@ -47,6 +47,7 @@ export function StandaloneTabBar({
   activeTabId,
   isSidebarVisible,
   isBottomPanelOpen,
+  hasConnection = true,
   onToggleSidebar,
   onSelectTab,
   onCloseTab,
@@ -58,6 +59,7 @@ export function StandaloneTabBar({
   activeTabId: string;
   isSidebarVisible: boolean;
   isBottomPanelOpen: boolean;
+  hasConnection?: boolean;
   onToggleSidebar: () => void;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string, e: React.MouseEvent) => void;
@@ -111,8 +113,9 @@ export function StandaloneTabBar({
 
         <button
           onClick={onNewSqlTab}
-          className="p-1.5 ml-1 text-[#858585] hover:text-white hover:bg-[#333333] rounded shrink-0"
-          title="New SQL Script"
+          disabled={!hasConnection}
+          className="p-1.5 ml-1 text-[#858585] hover:text-white hover:bg-[#333333] disabled:opacity-40 disabled:cursor-not-allowed rounded shrink-0"
+          title={hasConnection ? 'New SQL Script' : 'Connect to a database first'}
           aria-label="New SQL Tab"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -122,8 +125,9 @@ export function StandaloneTabBar({
       <div className="flex items-center gap-1 pr-2 shrink-0">
         <button
           onClick={onOpenErdTab}
-          className="p-1.5 rounded text-[#858585] hover:text-white hover:bg-[#333333] transition-colors"
-          title="Open ER Diagram Tab"
+          disabled={!hasConnection}
+          className="p-1.5 rounded text-[#858585] hover:text-white hover:bg-[#333333] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          title={hasConnection ? 'Open ER Diagram Tab' : 'Connect to a database first'}
           aria-label="Open ER Diagram"
         >
           <LayoutGrid className="w-3.5 h-3.5" />

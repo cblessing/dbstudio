@@ -4,10 +4,7 @@ import {
   EditorTab,
   TableDefinition,
 } from '../types/database';
-import {
-  INITIAL_CONNECTIONS,
-  INITIAL_ECOMMERCE_TABLES,
-} from '../engine/sqlEngineCore';
+import { INITIAL_ECOMMERCE_TABLES } from '../engine/sqlEngineCore';
 import { databaseManager } from '../engine/databaseManager';
 
 export type VsCodeViewMode = 'standalone' | 'sidebar' | 'editor';
@@ -38,7 +35,7 @@ export function createInitialTabs(
   config: VsCodeEditorConfig | undefined
 ): EditorTab[] {
   if (viewMode === 'editor' && config) {
-    const connId = config.connectionId ? config.connectionId : INITIAL_CONNECTIONS[0].id;
+    const connId = config.connectionId ? config.connectionId : '';
     return [
       {
         id: 'vscode_editor_tab',
@@ -56,17 +53,17 @@ export function createInitialTabs(
       id: 'tab_sql_1',
       title: 'Script-1.sql',
       type: 'query',
-      connectionId: INITIAL_CONNECTIONS[0].id,
+      connectionId: '',
       queryContent: '',
     },
   ];
 }
 
 export function resolveCurrentTableDefinition(
-  tabConnection: DatabaseConnection,
+  tabConnection: DatabaseConnection | null,
   tableName: string | undefined
 ): TableDefinition {
-  const allTables = tabConnection.schemas.flatMap((s) => s.tables);
+  const allTables = tabConnection ? tabConnection.schemas.flatMap((s) => s.tables) : [];
   const foundInConn = allTables.find((t) => t.name === tableName);
   if (foundInConn) return foundInConn;
   const foundInDefault = INITIAL_ECOMMERCE_TABLES.find((t) => t.name === tableName);
@@ -76,14 +73,14 @@ export function resolveCurrentTableDefinition(
 
 export function getInitialConnections(): DatabaseConnection[] {
   const synced = getInjectedGlobal<DatabaseConnection[]>('__VSCODE_INITIAL_CONNECTIONS__');
-  return synced ? synced : INITIAL_CONNECTIONS;
+  return synced ? synced : [];
 }
 
 export function getInitialConnectionId(
   config: VsCodeEditorConfig | undefined,
   conns: DatabaseConnection[]
 ): string {
-  return config?.connectionId ? config.connectionId : conns[0].id;
+  return config?.connectionId ? config.connectionId : (conns[0]?.id ?? '');
 }
 
 export function upsertConnectionList(
@@ -98,8 +95,8 @@ export function upsertConnectionList(
 export function findConnectionOrFallback(
   connections: DatabaseConnection[],
   id: string,
-  fallback: DatabaseConnection
-): DatabaseConnection {
+  fallback: DatabaseConnection | null
+): DatabaseConnection | null {
   const match = connections.find((c) => c.id === id);
   return match ? match : fallback;
 }

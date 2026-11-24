@@ -96,9 +96,25 @@ export function CompletionPopup({
   );
 }
 
+function resolveRunButtonMeta(
+  isExecuting: boolean,
+  hasSelection: boolean,
+  hasConnection: boolean
+): { runLabel: string; runTitle: string } {
+  const runLabel = isExecuting ? 'Running...' : hasSelection ? 'Execute Selection' : 'Execute';
+  if (!hasConnection) {
+    return { runLabel, runTitle: 'Connect to a database first' };
+  }
+  const runTitle = hasSelection
+    ? 'Execute Selected SQL (Ctrl+Enter / F5)'
+    : 'Execute SQL Query (Ctrl+Enter / F5)';
+  return { runLabel, runTitle };
+}
+
 export function SqlEditorToolbar({
   isExecuting,
   hasSelection,
+  hasConnection = true,
   onRun,
   onStop,
   onExplain,
@@ -111,6 +127,7 @@ export function SqlEditorToolbar({
 }: {
   isExecuting: boolean;
   hasSelection: boolean;
+  hasConnection?: boolean;
   onRun: () => void;
   onStop: () => void;
   onExplain: () => void;
@@ -121,14 +138,7 @@ export function SqlEditorToolbar({
   databaseName: string;
   onSelectConnection?: (id: string) => void;
 }) {
-  const runLabel = isExecuting
-    ? 'Running...'
-    : hasSelection
-    ? 'Execute Selection'
-    : 'Execute';
-  const runTitle = hasSelection
-    ? 'Execute Selected SQL (Ctrl+Enter / F5)'
-    : 'Execute SQL Query (Ctrl+Enter / F5)';
+  const { runLabel, runTitle } = resolveRunButtonMeta(isExecuting, hasSelection, hasConnection);
   const canSwitchConn = Boolean(connections?.length) && Boolean(onSelectConnection);
 
   return (
@@ -137,8 +147,8 @@ export function SqlEditorToolbar({
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={onRun}
-          disabled={isExecuting}
-          className="flex items-center gap-1 px-2.5 py-1 bg-[#238636] hover:bg-[#2ea043] disabled:opacity-50 text-white rounded font-medium shadow-sm transition-colors"
+          disabled={isExecuting || !hasConnection}
+          className="flex items-center gap-1 px-2.5 py-1 bg-[#238636] hover:bg-[#2ea043] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-medium shadow-sm transition-colors"
           title={runTitle}
           aria-label="Execute SQL Query"
         >

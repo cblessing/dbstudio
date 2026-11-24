@@ -4,7 +4,6 @@ import { ParsedConnectionUri } from '../../utils/connectionUri';
 import {
   ConnectionFormState,
   GeneralCard,
-  UriImportCard,
   ServerAuthCard,
   SecurityTlsCard,
 } from './ConnectionFormCards';
@@ -53,6 +52,7 @@ export function ConnectionConfigStep({
   onChange,
   onChangeDriver,
   onApplyUri,
+  onResolveSavedPassword,
 }: {
   form: ConnectionFormState;
   isEditing: boolean;
@@ -60,10 +60,10 @@ export function ConnectionConfigStep({
   onChange: (patch: Partial<ConnectionFormState>) => void;
   onChangeDriver: () => void;
   onApplyUri: (parsed: ParsedConnectionUri) => void;
+  onResolveSavedPassword?: () => Promise<string>;
 }) {
   const [openSections, setOpenSections] = useState({
     general: true,
-    uri: false,
     server: true,
     security: true,
   });
@@ -81,18 +81,14 @@ export function ConnectionConfigStep({
         onChangeDriver={onChangeDriver}
       />
 
-      <UriImportCard
-        isOpen={openSections.uri}
-        onToggle={() => toggleSection('uri')}
-        onApplyUri={onApplyUri}
-      />
-
       <ServerAuthCard
         form={form}
         isEditing={isEditing}
         isOpen={openSections.server}
         onToggle={() => toggleSection('server')}
         onChange={onChange}
+        onApplyUri={onApplyUri}
+        onResolveSavedPassword={onResolveSavedPassword}
       />
 
       <SecurityTlsCard

@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  DatabaseConnection,
-  EditorTab,
-  QueryResult,
-  TableDefinition,
-} from './types/database';
-import { INITIAL_CONNECTIONS } from './engine/sqlEngineCore';
+import { DatabaseConnection, EditorTab, QueryResult, TableDefinition } from './types/database';
 import { databaseManager } from './engine/databaseManager';
 import { StatusBar } from './components/vscode/StatusBar';
 import {
@@ -19,17 +13,8 @@ import { DatabaseNavigator } from './components/database/DatabaseNavigator';
 import { SqlEditor } from './components/editor/SqlEditor';
 import { TableDetailsView } from './components/views/TableDetailsView';
 import { ERDiagramViewer } from './components/diagram/ERDiagramViewer';
-import {
-  generateDropTableSql,
-  generateTruncateTableSql,
-  generateDropColumnSql,
-} from './utils/tableManagement';
-import {
-  downloadFile,
-  formatSqlValue,
-  postVsCodeMessage,
-  quoteSqlIdentifier,
-} from './utils/exportData';
+import { generateDropTableSql, generateTruncateTableSql, generateDropColumnSql } from './utils/tableManagement';
+import { downloadFile, formatSqlValue, postVsCodeMessage, quoteSqlIdentifier } from './utils/exportData';
 import { executeLiveQuery, deleteLiveConnection, isNetworkDatabaseType } from './utils/liveBridge';
 import {
   VsCodeViewMode,
@@ -44,6 +29,15 @@ import {
   useVsCodeHostSync,
   buildDestructiveConfirmConfig,
 } from './hooks/useVsCodeHostSync';
+
+function resolveTabConnInfo(tabConnection: DatabaseConnection | null) {
+  return {
+    id: tabConnection?.id ?? '',
+    name: tabConnection?.name ?? 'No Connection',
+    database: tabConnection?.database ?? '',
+    tables: tabConnection?.schemas[0]?.tables ?? [],
+  };
+}
 
 let nextTabId = 2;
 const createTabId = (prefix: string) => `${prefix}_${nextTabId++}`;
@@ -66,9 +60,7 @@ export default function App() {
     table: TableDefinition;
   } | null>(null);
   const [isCreateTableOpen, setIsCreateTableOpen] = useState(false);
-  const [createTableConnectionId, setCreateTableConnectionId] = useState<string>(
-    INITIAL_CONNECTIONS[0].id
-  );
+  const [createTableConnectionId, setCreateTableConnectionId] = useState<string>('');
   const [confirmModal, setConfirmModal] = useState<ConfirmModalConfig | null>(null);
   const [executionLogs, setExecutionLogs] = useState<string[]>([
     'Ready for query execution.',
@@ -110,10 +102,11 @@ export default function App() {
     });
   };
 
-  const activeConnection = findConnectionOrFallback(connections, activeConnectionId, connections[0]);
+  const activeConnection = findConnectionOrFallback(connections, activeConnectionId, connections[0] ?? null);
   const isVsCodeSplitView = viewMode !== 'standalone';
 
   const openSqlEditorTab = (connectionId: string, initialQuery?: string) => {
+    if (!connectionId) return;
     if (isVsCodeSplitView) {
       postVsCodeMessage({ command: 'openEditor', editorType: 'query', connectionId, initialQuery });
       return;
@@ -144,6 +137,7 @@ export default function App() {
 
   const openERDiagramTab = (connectionId: string) => {
     const targetConn = connections.find((c) => c.id === connectionId) ?? activeConnection;
+    if (!targetConn) return;
     const title = `${targetConn.database.replace(/\.[^.]+$/, '')}.erd`;
     if (isVsCodeSplitView) {
       postVsCodeMessage({ command: 'openEditor', editorType: 'erd', connectionId, title });
@@ -173,6 +167,9 @@ export default function App() {
     query: string,
     options?: { offset?: number; batchSize?: number }
   ): Promise<QueryResult> => {
+    if (!activeConnection) {
+      return { columns: [], rows: [], executionTimeMs: 0, fetchTimeMs: 0, rowCount: 0, query, error: 'No active database connection.' };
+    }
     setExecutionStats((prev) => ({ ...prev, isExecuting: true }));
     const timestamp = new Date().toLocaleTimeString();
 
@@ -204,7 +201,7 @@ export default function App() {
   };
 
   const handleFetchTableData = async (tableName: string, offset = 0): Promise<QueryResult> =>
-    isNetworkDatabaseType(activeConnection.type)
+    activeConnection && isNetworkDatabaseType(activeConnection.type)
       ? executeLiveQuery(activeConnection.id, `SELECT * FROM ${quoteSqlIdentifier(tableName)} LIMIT 1000 OFFSET ${offset}`)
       : databaseManager.getTableData(tableName, 1000, offset);
 
@@ -240,6 +237,7 @@ export default function App() {
   };
 
   const handleDownloadDatabase = () => {
+    if (!activeConnection) return;
     const binary = databaseManager.exportDatabaseBinary();
     if (!binary) return;
     const dbBaseName = activeConnection.database ? activeConnection.database : 'database_export';
@@ -327,7 +325,6 @@ export default function App() {
   };
 
   const handleDeleteConnection = (connId: string) => {
-    if (connections.length <= 1) return;
     const target = connections.find((c) => c.id === connId);
     if (target && isNetworkDatabaseType(target.type)) {
       void deleteLiveConnection(connId).catch(() => {});
@@ -336,7 +333,7 @@ export default function App() {
     setConnections(next);
     broadcastConnectionsUpdate(next);
     if (activeConnectionId === connId) {
-      setActiveConnectionId(next[0].id);
+      setActiveConnectionId(next[0]?.id ?? '');
     }
   };
 
@@ -420,12 +417,13 @@ export default function App() {
         />
       );
     }
+    const connInfo = resolveTabConnInfo(tabConnection);
     if (activeTab.type === 'erd') {
       return (
         <ERDiagramViewer
-          tables={tabConnection.schemas[0]?.tables ?? []}
-          connectionName={tabConnection.name}
-          onSelectTable={(tblName) => openTableTab(tabConnection.id, tblName)}
+          tables={connInfo.tables}
+          connectionName={connInfo.name}
+          onSelectTable={(tblName) => tabConnection && openTableTab(tabConnection.id, tblName)}
         />
       );
     }
@@ -433,10 +431,10 @@ export default function App() {
       <SqlEditor
         initialQuery={activeTab.queryContent}
         onExecuteQuery={handleExecuteQuery}
-        connectionName={tabConnection.name}
-        databaseName={tabConnection.database}
+        connectionName={connInfo.name}
+        databaseName={connInfo.database}
         connections={connections}
-        connectionId={tabConnection.id}
+        connectionId={connInfo.id}
         onSelectConnection={(nextConnId) => {
           setActiveConnectionId(nextConnId);
           setTabs((prev) => prev.map((t) => (t.id === activeTab.id ? { ...t, connectionId: nextConnId } : t)));
@@ -474,6 +472,7 @@ export default function App() {
             activeTabId={activeTabId}
             isSidebarVisible={isSidebarVisible}
             isBottomPanelOpen={isBottomPanelOpen}
+            hasConnection={Boolean(activeConnection)}
             onToggleSidebar={() => setIsSidebarVisible(!isSidebarVisible)}
             onSelectTab={setActiveTabId}
             onCloseTab={closeTab}

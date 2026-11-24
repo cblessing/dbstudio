@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QueryResult, DatabaseConnection } from '../../types/database';
-import { INITIAL_CONNECTIONS } from '../../engine/sqlEngineCore';
 import { formatSql } from '../../utils/sqlFormatter';
 import { mergePaginatedResults } from '../../utils/exportData';
 import {
@@ -31,15 +30,12 @@ function resolveCurrentConnection(
   connections: DatabaseConnection[] | undefined,
   connectionId: string | undefined,
   connectionName: string
-): DatabaseConnection {
-  if (connections && connections.length > 0) {
-    const byId = connections.find((c) => c.id === connectionId);
-    if (byId) return byId;
-    const byName = connections.find((c) => c.name === connectionName);
-    return byName ? byName : connections[0];
-  }
-  const initialByName = INITIAL_CONNECTIONS.find((c) => c.name === connectionName);
-  return initialByName ? initialByName : INITIAL_CONNECTIONS[0];
+): DatabaseConnection | null {
+  if (!connections || connections.length === 0) return null;
+  const byId = connections.find((c) => c.id === connectionId);
+  if (byId) return byId;
+  const byName = connections.find((c) => c.name === connectionName);
+  return byName ? byName : connections[0];
 }
 
 const NAV_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End']);
@@ -84,6 +80,10 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
     cursorOffset: number,
     forceTrigger = false
   ) => {
+    if (!currentConnection) {
+      setCompletionResult(null);
+      return;
+    }
     const res = getSqlCompletions(textValue, cursorOffset, currentConnection, forceTrigger);
     if (res.items.length === 0) {
       setCompletionResult(null);
@@ -329,6 +329,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
       <SqlEditorToolbar
         isExecuting={isExecuting}
         hasSelection={Boolean(selectedText)}
+        hasConnection={Boolean(currentConnection)}
         onRun={() => runQuery()}
         onStop={stopQuery}
         onExplain={async () => {

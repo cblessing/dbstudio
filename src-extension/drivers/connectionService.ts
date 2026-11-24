@@ -78,6 +78,10 @@ export class LiveConnectionService {
     return this.configs.has(connectionId);
   }
 
+  public async getPassword(connectionId: string): Promise<string> {
+    return this.resolvePassword(connectionId);
+  }
+
   private async resolvePassword(connectionId: string, overridePassword?: string): Promise<string> {
     if (typeof overridePassword === 'string' && overridePassword.length > 0) {
       return overridePassword;

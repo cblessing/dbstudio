@@ -6,17 +6,18 @@ import {
   testLiveConnection,
   saveLiveConnection,
   introspectLiveSchema,
+  getLiveConnectionPassword,
   LiveConnectionPayload,
 } from '../../utils/liveBridge';
 import { ParsedConnectionUri } from '../../utils/connectionUri';
-import { X, Zap, ArrowRight, RefreshCw } from 'lucide-react';
+import { X, Zap, RefreshCw } from 'lucide-react';
 import { DriverPickerStep } from './DriverPickerStep';
 import {
   ConnectionConfigStep,
   ConnectionFormState,
   TestConnectionStatus,
 } from './ConnectionConfigStep';
-import { HeaderBadgeColorPicker } from './ConnectionFormCards';
+import { HeaderBadgeColorPicker } from './HeaderBadgeColorPicker';
 
 interface NewConnectionModalProps {
   isOpen: boolean;
@@ -217,29 +218,31 @@ function ModalFooter({
   onCancel: () => void;
 }) {
   return (
-    <div className="shrink-0 flex items-center justify-end px-4 py-2.5 bg-[#26262a] border-t border-white/10">
+    <div className="shrink-0 flex items-center justify-between px-4 py-2.5 bg-[#26262a] border-t border-white/10">
+      {isConfigure ? (
+        <button
+          type="button"
+          onClick={onTest}
+          disabled={isTesting || isSaving}
+          className={`${FOOTER_BTN_BASE} rounded-md border border-white/10 bg-[#313136] hover:bg-[#3c3c42] text-[#f1f1f1]`}
+          aria-label="Test Database Connection"
+        >
+          {isTesting ? (
+            <RefreshCw className="w-3 h-3 animate-spin text-sky-400" />
+          ) : (
+            <Zap className="w-3 h-3 text-amber-400" />
+          )}
+          <span>{isTesting ? 'Testing' : 'Test'}</span>
+        </button>
+      ) : (
+        <div />
+      )}
+
       <div
         role="group"
         aria-label="Connection dialog actions"
         className="inline-flex rounded-md overflow-hidden border border-white/10 divide-x divide-white/10"
       >
-        {isConfigure && (
-          <button
-            type="button"
-            onClick={onTest}
-            disabled={isTesting || isSaving}
-            className={`${FOOTER_BTN_BASE} bg-[#313136] hover:bg-[#3c3c42] text-[#f1f1f1]`}
-            aria-label="Test Database Connection"
-          >
-            {isTesting ? (
-              <RefreshCw className="w-3 h-3 animate-spin text-sky-400" />
-            ) : (
-              <Zap className="w-3 h-3 text-amber-400" />
-            )}
-            <span>{isTesting ? 'Testing' : 'Test'}</span>
-          </button>
-        )}
-
         <button
           type="button"
           onClick={onCancel}
@@ -256,11 +259,7 @@ function ModalFooter({
             className={`${FOOTER_BTN_BASE} bg-[#007acc] hover:bg-[#0066ad] text-white`}
             aria-label="Connect and Save Database"
           >
-            {isSaving ? (
-              <RefreshCw className="w-3 h-3 animate-spin" />
-            ) : (
-              <ArrowRight className="w-3 h-3" />
-            )}
+            {isSaving && <RefreshCw className="w-3 h-3 animate-spin" />}
             <span>{isSaving ? 'Saving' : isEditing ? 'Save' : 'Connect'}</span>
           </button>
         )}
@@ -371,6 +370,11 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
     onClose();
   };
 
+  const resolveSavedPassword = async (): Promise<string> => {
+    if (!editingConnection) return '';
+    return getLiveConnectionPassword(editingConnection.id).catch(() => '');
+  };
+
   const filteredDrivers = filterDriversByQuery(DATABASE_DRIVERS, categoryFilter, searchQuery);
 
   return (
@@ -422,12 +426,14 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
           />
         ) : (
           <ConnectionConfigStep
+            key={openSessionKey}
             form={form}
             isEditing={Boolean(editingConnection)}
             testStatus={testStatus}
             onChange={updateForm}
             onChangeDriver={() => updateForm({ step: 'pick' })}
             onApplyUri={(parsed) => setForm((prev) => mergeParsedUriIntoForm(prev, parsed))}
+            onResolveSavedPassword={resolveSavedPassword}
           />
         )}
 

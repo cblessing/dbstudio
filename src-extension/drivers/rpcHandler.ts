@@ -40,6 +40,8 @@ const RPC_HANDLERS: Record<string, RpcHandlerFn> = {
     ),
   introspectLiveSchema: (svc, msg) =>
     svc.introspectSchema(asOptionalString(msg.connectionId) ?? ''),
+  getLiveConnectionPassword: (svc, msg) =>
+    svc.getPassword(asOptionalString(msg.connectionId) ?? ''),
 };
 
 export async function tryHandleLiveRpcMessage(

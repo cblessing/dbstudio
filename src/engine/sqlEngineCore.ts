@@ -1,7 +1,6 @@
 import {
   DatabaseType,
   DatabaseDriverInfo,
-  DatabaseConnection,
   SchemaDefinition,
   ExecutionPlanStep,
 } from '../types/database';
@@ -177,39 +176,6 @@ export function buildDefaultSchemaForType(
     procedures: INITIAL_ECOMMERCE_PROCEDURES,
   };
 }
-
-export const INITIAL_CONNECTIONS: DatabaseConnection[] = [
-  {
-    id: 'conn_sqlite_local',
-    name: 'SQLite - Local',
-    type: 'sqlite',
-    host: 'localhost',
-    port: 0,
-    database: 'ecommerce_prod.db',
-    username: 'admin',
-    ssl: false,
-    colorBadge: '#003B57',
-    status: 'connected',
-    version: 'SQLite 3.45',
-    pingMs: 0.8,
-    schemas: [buildDefaultSchemaForType('sqlite', 'main')],
-  },
-  {
-    id: 'conn_duckdb_analytics',
-    name: 'DuckDB - Analytics',
-    type: 'duckdb',
-    host: 'memory',
-    port: 0,
-    database: 'metrics_vectorized.duckdb',
-    username: 'analyst',
-    ssl: false,
-    colorBadge: '#E6A700',
-    status: 'connected',
-    version: 'DuckDB v0.10.0',
-    pingMs: 0.4,
-    schemas: [buildDefaultSchemaForType('duckdb', 'main', 4)],
-  },
-];
 
 function buildPrimaryAccessStep(q: string): { step: ExecutionPlanStep; nextId: number } {
   if (q.includes('JOIN')) {

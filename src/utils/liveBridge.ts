@@ -119,3 +119,7 @@ export function executeLiveQuery(
 export function introspectLiveSchema(connectionId: string): Promise<TableDefinition[]> {
   return invokeLiveRpc<TableDefinition[]>('introspectLiveSchema', { connectionId }, 20000);
 }
+
+export function getLiveConnectionPassword(connectionId: string): Promise<string> {
+  return invokeLiveRpc<string>('getLiveConnectionPassword', { connectionId }, 5000);
+}

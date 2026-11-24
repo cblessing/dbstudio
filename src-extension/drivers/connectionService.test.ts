@@ -102,6 +102,7 @@ test('LiveConnectionService stores secrets in SecretStorage, passes them to driv
 
   assert.equal('password' in saved, false);
   assert.equal(secrets.storeMap.get('dbstudio.conn.conn_pg_live.password'), 'MyTopSecretPass!');
+  assert.equal(await service.getPassword('conn_pg_live'), 'MyTopSecretPass!');
 
   const res = await service.executeQuery('conn_pg_live', 'SELECT 1 AS ok');
   assert.equal(observedPassword, 'MyTopSecretPass!');
@@ -109,5 +110,6 @@ test('LiveConnectionService stores secrets in SecretStorage, passes them to driv
 
   await service.deleteConnection('conn_pg_live');
   assert.equal(secrets.storeMap.has('dbstudio.conn.conn_pg_live.password'), false);
+  assert.equal(await service.getPassword('conn_pg_live'), '');
   assert.equal(service.hasConnection('conn_pg_live'), false);
 });

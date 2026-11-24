@@ -1,10 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getSqlCompletions } from './sqlCompletion';
-import { INITIAL_CONNECTIONS, buildDefaultSchemaForType } from '../engine/sqlEngineCore';
+import { buildDefaultSchemaForType } from '../engine/sqlEngineCore';
 import { DatabaseConnection } from '../types/database';
 
-const sqliteConn = INITIAL_CONNECTIONS.find((c) => c.id === 'conn_sqlite_local')!;
+const sqliteConn: DatabaseConnection = {
+  id: 'conn_sqlite_test',
+  name: 'SQLite Test',
+  type: 'sqlite',
+  host: 'localhost',
+  port: 0,
+  database: 'ecommerce_prod.db',
+  username: 'admin',
+  ssl: false,
+  colorBadge: '#003B57',
+  status: 'connected',
+  schemas: [buildDefaultSchemaForType('sqlite', 'main')],
+};
 const sqlServerConn: DatabaseConnection = {
   id: 'conn_sqlserver_test',
   name: 'SQL Server Test',

@@ -242,7 +242,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
   const handleConnectionContextMenu = (e: React.MouseEvent, conn: DatabaseConnection) =>
     openContextMenu(
       e,
-      buildConnectionContextMenuItems(conn, connections.length > 1, {
+      buildConnectionContextMenuItems(conn, true, {
         onEditConnection,
         onOpenSqlEditor,
         onOpenERDiagram,
@@ -250,8 +250,10 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
       })
     );
 
-  const activeConn = connections.find((c) => c.id === activeConnectionId) ?? connections[0];
-  const defaultActiveId = activeConn ? activeConn.id : 'conn_sqlite_local';
+  const activeConn = connections.find((c) => c.id === activeConnectionId) ?? connections[0] ?? null;
+  const hasConnection = activeConn !== null;
+  const defaultActiveId = activeConn ? activeConn.id : '';
+  const connActionTitle = (label: string) => (hasConnection ? label : 'Connect to a database first');
 
   return (
     <div
@@ -275,16 +277,18 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
           </button>
           <button
             onClick={() => onOpenSqlEditor(defaultActiveId)}
-            className="p-1 hover:bg-[#3c3c3c] rounded text-[#cccccc] hover:text-white transition-colors"
-            title="New SQL Script"
+            disabled={!hasConnection}
+            className="p-1 hover:bg-[#3c3c3c] disabled:opacity-40 disabled:cursor-not-allowed rounded text-[#cccccc] hover:text-white transition-colors"
+            title={connActionTitle('New SQL Script')}
             aria-label="New SQL Script"
           >
             <FileCode className="w-3.5 h-3.5 text-amber-400" />
           </button>
           <button
             onClick={() => onOpenERDiagram(defaultActiveId)}
-            className="p-1 hover:bg-[#3c3c3c] rounded text-[#cccccc] hover:text-white transition-colors"
-            title="Open ER Diagram"
+            disabled={!hasConnection}
+            className="p-1 hover:bg-[#3c3c3c] disabled:opacity-40 disabled:cursor-not-allowed rounded text-[#cccccc] hover:text-white transition-colors"
+            title={connActionTitle('Open ER Diagram')}
             aria-label="Open ER Diagram"
           >
             <LayoutGrid className="w-3.5 h-3.5 text-sky-400" />
@@ -292,8 +296,9 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
           {onExportDatabase && (
             <button
               onClick={onExportDatabase}
-              className="p-1 hover:bg-[#3c3c3c] rounded text-[#cccccc] hover:text-white transition-colors"
-              title="Export SQLite Database (.sqlite)"
+              disabled={!hasConnection}
+              className="p-1 hover:bg-[#3c3c3c] disabled:opacity-40 disabled:cursor-not-allowed rounded text-[#cccccc] hover:text-white transition-colors"
+              title={connActionTitle('Export SQLite Database (.sqlite)')}
               aria-label="Export SQLite Database"
             >
               <Download className="w-3.5 h-3.5 text-purple-400" />
@@ -309,8 +314,9 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
             type="text"
             placeholder="Filter tables, views, procedures..."
             value={searchTerm}
+            disabled={!hasConnection}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-[#1e1e1e] border border-[#3c3c3c] focus:border-[#007acc] rounded px-2 pl-7 py-1 text-xs text-[#cccccc] placeholder-[#6b6b6b] outline-none"
+            className="w-full bg-[#1e1e1e] border border-[#3c3c3c] focus:border-[#007acc] disabled:opacity-40 disabled:cursor-not-allowed rounded px-2 pl-7 py-1 text-xs text-[#cccccc] placeholder-[#6b6b6b] outline-none"
             aria-label="Filter database objects"
           />
           {searchTerm && (
@@ -326,23 +332,35 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto py-1">
-        {connections.map((conn) => {
-          const isConnExpanded = Boolean(expandedConnections[conn.id]);
-          const isActive = conn.id === activeConnectionId;
+        {!hasConnection ? (
+          <div className="px-4 py-8 text-center text-[#858585] space-y-2">
+            <Database className="w-6 h-6 mx-auto opacity-50" />
+            <p className="text-xs text-[#a0a0a0]">No database connections</p>
+            <button
+              onClick={onOpenNewConnectionModal}
+              className="px-3 py-1.5 rounded bg-[#007acc] hover:bg-[#0066ad] text-white text-xs font-medium transition-colors"
+            >
+              + New Connection
+            </button>
+          </div>
+        ) : (
+          connections.map((conn) => {
+            const isConnExpanded = Boolean(expandedConnections[conn.id]);
+            const isActive = conn.id === activeConnectionId;
 
-          return (
-            <div key={conn.id} className="mb-0.5">
-              <ConnectionTreeHeader
-                conn={conn}
-                isExpanded={isConnExpanded}
-                isActive={isActive}
-                canDelete={connections.length > 1}
-                onToggleConnection={() => toggleConnection(conn.id)}
-                onContextMenu={(e) => handleConnectionContextMenu(e, conn)}
-                onOpenSqlEditor={() => onOpenSqlEditor(conn.id)}
-                onOpenERDiagram={() => onOpenERDiagram(conn.id)}
-                onDeleteConnection={() => onDeleteConnection(conn.id)}
-              />
+            return (
+              <div key={conn.id} className="mb-0.5">
+                <ConnectionTreeHeader
+                  conn={conn}
+                  isExpanded={isConnExpanded}
+                  isActive={isActive}
+                  canDelete={true}
+                  onToggleConnection={() => toggleConnection(conn.id)}
+                  onContextMenu={(e) => handleConnectionContextMenu(e, conn)}
+                  onOpenSqlEditor={() => onOpenSqlEditor(conn.id)}
+                  onOpenERDiagram={() => onOpenERDiagram(conn.id)}
+                  onDeleteConnection={() => onDeleteConnection(conn.id)}
+                />
 
               {isConnExpanded && (
                 <div className="pl-3.5">
@@ -401,9 +419,10 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
                   })}
                 </div>
               )}
-            </div>
-          );
-        })}
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="px-2.5 py-1.5 border-t border-[#333333] bg-[#1e1e1e] flex items-center justify-between text-[11px] text-[#858585]">
