@@ -406,6 +406,54 @@ export function ServerAuthCard({
   );
 }
 
+function SecurityToggleRow({
+  icon,
+  title,
+  description,
+  checked,
+  onToggle,
+  bordered = false,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  checked: boolean;
+  onToggle: () => void;
+  bordered?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 ${
+        bordered ? 'pt-2.5 border-t border-white/5' : ''
+      }`}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        {icon}
+        <div className="min-w-0">
+          <p className="text-[#e6e6e6] font-medium">{title}</p>
+          <p className="text-[11px] text-[#8e8e93]">{description}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={title}
+        onClick={onToggle}
+        className={`w-9 h-5 rounded-full transition-colors p-0.5 shrink-0 cursor-pointer ${
+          checked ? 'bg-[#007acc]' : 'bg-[#3a3a3e]'
+        }`}
+      >
+        <span
+          className={`block w-4 h-4 rounded-full bg-white transition-transform ${
+            checked ? 'translate-x-4' : 'translate-x-0'
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 export function SecurityTlsCard({
   form,
   isOpen,
@@ -425,47 +473,23 @@ export function SecurityTlsCard({
       isOpen={isOpen}
       onToggle={onToggle}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-          <div>
-            <p className="text-[#e6e6e6] font-medium">Use SSL / TLS Encryption</p>
-            <p className="text-[11px] text-[#8e8e93]">Encrypts traffic between VS Code and the database server.</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={form.ssl}
-          aria-label="Use SSL / TLS Encryption"
-          onClick={() => onChange({ ssl: !form.ssl })}
-          className={`w-9 h-5 rounded-full transition-colors p-0.5 shrink-0 ${
-            form.ssl ? 'bg-[#007acc]' : 'bg-[#3a3a3e]'
-          }`}
-        >
-          <span
-            className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-              form.ssl ? 'translate-x-4' : 'translate-x-0'
-            }`}
-          />
-        </button>
-      </div>
+      <SecurityToggleRow
+        icon={<Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+        title="Use SSL / TLS Encryption"
+        description="Encrypts traffic between VS Code and the database server."
+        checked={form.ssl}
+        onToggle={() => onChange({ ssl: !form.ssl })}
+      />
 
       {form.ssl && (
-        <label className="flex items-start gap-2.5 pt-2 border-t border-white/5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.allowSelfSigned}
-            onChange={(e) => onChange({ allowSelfSigned: e.target.checked })}
-            className="mt-0.5 rounded bg-[#19191b] border-[#3a3a3e] text-[#007acc] focus:ring-0"
-          />
-          <div>
-            <span className="text-[#d4d4d8] font-medium block">Allow self-signed certificate</span>
-            <span className="text-[11px] text-[#8e8e93]">
-              Enable for local Podman/dev containers. Keep unchecked for production CA certificates.
-            </span>
-          </div>
-        </label>
+        <SecurityToggleRow
+          icon={<Shield className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+          title="Allow self-signed certificate"
+          description="Enable for local Podman/dev containers. Keep disabled for production CA certificates."
+          checked={form.allowSelfSigned}
+          onToggle={() => onChange({ allowSelfSigned: !form.allowSelfSigned })}
+          bordered
+        />
       )}
     </CollapsibleCard>
   );
