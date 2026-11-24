@@ -33,7 +33,7 @@ import {
   postVsCodeMessage,
   quoteSqlIdentifier,
 } from './utils/exportData';
-import { executeLiveQuery, deleteLiveConnection } from './utils/liveBridge';
+import { executeLiveQuery, deleteLiveConnection, isNetworkDatabaseType } from './utils/liveBridge';
 import {
   VsCodeViewMode,
   VsCodeEditorConfig,
@@ -179,10 +179,9 @@ export default function App() {
     const timestamp = new Date().toLocaleTimeString();
 
     try {
-      const res =
-        activeConnection.connectionMode === 'live'
-          ? await executeLiveQuery(activeConnection.id, query, options)
-          : await databaseManager.executeQuery(query, options);
+      const res = isNetworkDatabaseType(activeConnection.type)
+        ? await executeLiveQuery(activeConnection.id, query, options)
+        : await databaseManager.executeQuery(query, options);
       setExecutionStats({
         lastTimeMs: res.executionTimeMs,
         rowCount: res.rowCount,
@@ -207,7 +206,7 @@ export default function App() {
   };
 
   const handleFetchTableData = async (tableName: string, offset = 0): Promise<QueryResult> =>
-    activeConnection.connectionMode === 'live'
+    isNetworkDatabaseType(activeConnection.type)
       ? executeLiveQuery(activeConnection.id, `SELECT * FROM ${quoteSqlIdentifier(tableName)} LIMIT 1000 OFFSET ${offset}`)
       : databaseManager.getTableData(tableName, 1000, offset);
 
@@ -332,7 +331,7 @@ export default function App() {
   const handleDeleteConnection = (connId: string) => {
     if (connections.length <= 1) return;
     const target = connections.find((c) => c.id === connId);
-    if (target?.connectionMode === 'live') {
+    if (target && isNetworkDatabaseType(target.type)) {
       void deleteLiveConnection(connId).catch(() => {});
     }
     const next = connections.filter((c) => c.id !== connId);

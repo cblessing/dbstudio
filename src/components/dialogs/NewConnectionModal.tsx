@@ -8,7 +8,7 @@ import {
   buildDefaultSchemaForType,
 } from '../../engine/sqlEngineCore';
 import {
-  isVsCodeWebview,
+  isNetworkDatabaseType,
   testLiveConnection,
   saveLiveConnection,
   introspectLiveSchema,
@@ -136,7 +136,7 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
   };
 
   const filteredDrivers = filterDriversByQuery(DATABASE_DRIVERS, categoryFilter, searchQuery);
-  const canUseLiveDriver = isVsCodeWebview() && selectedDriver.defaultPort > 0;
+  const isNetworkDriver = isNetworkDatabaseType(selectedDriver.id);
 
   const buildLivePayload = (connId: string): LiveConnectionPayload => ({
     id: connId,
@@ -151,7 +151,7 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
 
   const handleTestConnection = async () => {
     setTestStatus({ testing: true });
-    if (canUseLiveDriver) {
+    if (isNetworkDriver) {
       try {
         const res = await testLiveConnection(buildLivePayload(`test_${selectedDriver.id}`), password);
         setTestStatus({
@@ -170,32 +170,33 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
       return;
     }
 
-    setTimeout(() => {
-      const isEmbedded = selectedDriver.defaultPort === 0;
-      const latency = isEmbedded ? 0.4 : 12.5;
-      setTestStatus({
-        testing: false,
-        success: true,
-        latencyMs: latency,
-        message: isEmbedded
-          ? `Connected locally in ${latency}ms.`
-          : `Local workspace mode: ${selectedDriver.name} (${host}:${port}, SSL: ${ssl ? 'On' : 'Off'}).`,
-      });
-    }, 300);
+    setTestStatus({
+      testing: false,
+      success: true,
+      latencyMs: 0.4,
+      message: 'Connected to local embedded engine in 0.4ms.',
+    });
   };
 
   const handleSaveConnection = async () => {
     const connId = `conn_${Date.now()}_${selectedDriver.id}`;
     const defaultSchema = buildDefaultSchemaForType(selectedDriver.id);
     let schemas = [defaultSchema];
-    let connectionMode: 'local' | 'live' = 'local';
 
-    if (canUseLiveDriver) {
-      await saveLiveConnection(buildLivePayload(connId), password);
-      connectionMode = 'live';
-      const liveTables = await introspectLiveSchema(connId).catch(() => []);
-      if (liveTables.length > 0) {
-        schemas = [{ ...defaultSchema, tables: liveTables }];
+    if (isNetworkDriver) {
+      try {
+        await saveLiveConnection(buildLivePayload(connId), password);
+        const liveTables = await introspectLiveSchema(connId).catch(() => []);
+        if (liveTables.length > 0) {
+          schemas = [{ ...defaultSchema, tables: liveTables }];
+        }
+      } catch (err) {
+        setTestStatus({
+          testing: false,
+          success: false,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        return;
       }
     }
 
@@ -209,7 +210,6 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
       username,
       ssl,
       rejectUnauthorized: !allowSelfSigned,
-      connectionMode,
       colorBadge: selectedDriver.color,
       status: 'connected',
       pingMs: testStatus?.latencyMs ?? 1.2,

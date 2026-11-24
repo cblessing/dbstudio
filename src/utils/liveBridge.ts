@@ -57,6 +57,10 @@ function ensureRpcListener(): void {
   listenerAttached = true;
 }
 
+export function isNetworkDatabaseType(type: DatabaseType): boolean {
+  return type !== 'sqlite' && type !== 'duckdb';
+}
+
 export function isVsCodeWebview(): boolean {
   const g = globalThis as any;
   return Boolean(g.__vscodeApi || typeof g.acquireVsCodeApi === 'function');

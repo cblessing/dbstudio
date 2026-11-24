@@ -1,10 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getSqlCompletions } from './sqlCompletion';
-import { INITIAL_CONNECTIONS } from '../engine/sqlEngineCore';
+import { INITIAL_CONNECTIONS, buildDefaultSchemaForType } from '../engine/sqlEngineCore';
+import { DatabaseConnection } from '../types/database';
 
 const sqliteConn = INITIAL_CONNECTIONS.find((c) => c.id === 'conn_sqlite_local')!;
-const sqlServerConn = INITIAL_CONNECTIONS.find((c) => c.id === 'conn_sqlserver_azure')!;
+const sqlServerConn: DatabaseConnection = {
+  id: 'conn_sqlserver_test',
+  name: 'SQL Server Test',
+  type: 'sqlserver',
+  host: '127.0.0.1',
+  port: 1433,
+  database: 'master',
+  username: 'sa',
+  ssl: true,
+  colorBadge: '#CC292B',
+  status: 'connected',
+  schemas: [buildDefaultSchemaForType('sqlserver', 'dbo')],
+};
 
 test('getSqlCompletions waits when typing "select * from " until user starts typing an object name', () => {
   const query = 'select * from ';
