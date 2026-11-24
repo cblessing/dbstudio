@@ -294,6 +294,8 @@ export function SchemaObjectGroups({
   onEditColumns,
   onDropTableClick,
   onSchemaContextMenu,
+  onViewsGroupContextMenu,
+  onProceduresGroupContextMenu,
   onTableContextMenu,
   onViewContextMenu,
   onProcedureContextMenu,
@@ -314,6 +316,8 @@ export function SchemaObjectGroups({
   onEditColumns: (connId: string, table: TableDefinition) => void;
   onDropTableClick: (connId: string, tableName: string) => void;
   onSchemaContextMenu: (e: React.MouseEvent, connId: string, schemaName: string) => void;
+  onViewsGroupContextMenu: (e: React.MouseEvent, connId: string, schemaName: string) => void;
+  onProceduresGroupContextMenu: (e: React.MouseEvent, connId: string, schemaName: string) => void;
   onTableContextMenu: (e: React.MouseEvent, connId: string, tbl: TableDefinition) => void;
   onViewContextMenu: (e: React.MouseEvent, connId: string, vw: ViewDefinition) => void;
   onProcedureContextMenu: (
@@ -400,8 +404,9 @@ export function SchemaObjectGroups({
           count={filteredViews.length}
           isExpanded={isViewsExpanded}
           folderColorClass="text-emerald-400"
-          title="Database Views"
+          title="Database Views (Right-click to create new view)"
           onToggle={() => onToggleObjectGroup(viewsGroupKey, false)}
+          onContextMenu={(e) => onViewsGroupContextMenu(e, connId, schema.name)}
         />
 
         {isViewsExpanded && (
@@ -433,8 +438,9 @@ export function SchemaObjectGroups({
           count={filteredProcedures.length}
           isExpanded={isProceduresExpanded}
           folderColorClass="text-amber-400"
-          title="Stored Procedures"
+          title="Stored Procedures (Right-click to create new procedure)"
           onToggle={() => onToggleObjectGroup(proceduresGroupKey, false)}
+          onContextMenu={(e) => onProceduresGroupContextMenu(e, connId, schema.name)}
         />
 
         {isProceduresExpanded && (

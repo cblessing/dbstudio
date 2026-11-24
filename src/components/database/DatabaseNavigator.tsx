@@ -12,6 +12,8 @@ import {
   buildTableContextMenuItems,
   buildViewContextMenuItems,
   buildProcedureContextMenuItems,
+  buildViewsGroupContextMenuItems,
+  buildProceduresGroupContextMenuItems,
   buildColumnContextMenuItems,
   buildSchemaContextMenuItems,
   NavigatorMenuCallbacks,
@@ -125,22 +127,29 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
     setContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
+  const getConnDialect = (connId: string) =>
+    connections.find((c) => c.id === connId)?.type ?? 'sqlite';
+
   const handleTableContextMenu = (e: React.MouseEvent, connId: string, tbl: TableDefinition) =>
     openContextMenu(e, buildTableContextMenuItems(connId, tbl, menuCallbacks));
 
   const handleViewContextMenu = (e: React.MouseEvent, connId: string, vw: ViewDefinition) =>
-    openContextMenu(e, buildViewContextMenuItems(connId, vw, menuCallbacks));
+    openContextMenu(e, buildViewContextMenuItems(connId, vw, menuCallbacks, getConnDialect(connId)));
 
   const handleProcedureContextMenu = (e: React.MouseEvent, connId: string, proc: ProcedureDefinition) =>
-    openContextMenu(e, buildProcedureContextMenuItems(connId, proc, menuCallbacks));
+    openContextMenu(e, buildProcedureContextMenuItems(connId, proc, menuCallbacks, getConnDialect(connId)));
+
+  const handleViewsGroupContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
+    openContextMenu(e, buildViewsGroupContextMenuItems(connId, schemaName, getConnDialect(connId), menuCallbacks));
+
+  const handleProceduresGroupContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
+    openContextMenu(e, buildProceduresGroupContextMenuItems(connId, schemaName, getConnDialect(connId), menuCallbacks));
 
   const handleColumnContextMenu = (e: React.MouseEvent, connId: string, tbl: TableDefinition, col: ColumnDefinition) =>
     openContextMenu(e, buildColumnContextMenuItems(connId, tbl, col, menuCallbacks));
 
-  const handleSchemaContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) => {
-    const conn = connections.find((c) => c.id === connId);
-    openContextMenu(e, buildSchemaContextMenuItems(connId, schemaName, menuCallbacks, conn?.type));
-  };
+  const handleSchemaContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
+    openContextMenu(e, buildSchemaContextMenuItems(connId, schemaName, menuCallbacks, getConnDialect(connId)));
 
   const handleConnectionContextMenu = (e: React.MouseEvent, conn: DatabaseConnection) =>
     openContextMenu(
@@ -269,6 +278,8 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
                               onEditColumns={onEditColumns}
                               onDropTableClick={onDropTableClick}
                               onSchemaContextMenu={handleSchemaContextMenu}
+                              onViewsGroupContextMenu={handleViewsGroupContextMenu}
+                              onProceduresGroupContextMenu={handleProceduresGroupContextMenu}
                               onTableContextMenu={handleTableContextMenu}
                               onViewContextMenu={handleViewContextMenu}
                               onProcedureContextMenu={handleProcedureContextMenu}

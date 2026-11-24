@@ -8,6 +8,8 @@ import {
   generateRenameColumnSql,
   generateDropColumnSql,
   generateCreateTableSql,
+  generateCreateViewTemplateSql,
+  generateCreateProcedureTemplateSql,
 } from './tableManagement';
 
 test('generateDropTableSql outputs valid DROP TABLE statement', () => {
@@ -116,4 +118,19 @@ test('tableManagement escapes single quotes and sanitizes default values against
   });
   assert.ok(addColSql.includes('`note` VARCHAR(50) DEFAULT'));
   assert.ok(addColSql.includes("DEFAULT '0''; DROP TABLE products; --'"));
+});
+
+test('generateCreateViewTemplateSql and generateCreateProcedureTemplateSql produce dialect-aware scripts', () => {
+  const pgView = generateCreateViewTemplateSql('public', 'postgres');
+  assert.ok(pgView.includes('CREATE OR REPLACE VIEW "public"."new_view" AS'));
+
+  const mssqlView = generateCreateViewTemplateSql('dbo', 'sqlserver');
+  assert.ok(mssqlView.includes('CREATE OR ALTER VIEW [dbo].[new_view]'));
+
+  const pgProc = generateCreateProcedureTemplateSql('public', 'postgres');
+  assert.ok(pgProc.includes('CREATE OR REPLACE PROCEDURE "public"."new_procedure"()'));
+  assert.ok(pgProc.includes('LANGUAGE plpgsql'));
+
+  const oraProc = generateCreateProcedureTemplateSql('hr', 'oracle');
+  assert.ok(oraProc.includes('CREATE OR REPLACE PROCEDURE "HR"."NEW_PROCEDURE"'));
 });

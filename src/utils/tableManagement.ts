@@ -218,3 +218,43 @@ export function generateCreateTableSql(
 
   return `CREATE TABLE ${qualifyTable(tableName, dialect)} (\n${colDefs.join(',\n')}\n);`;
 }
+
+export function generateCreateViewTemplateSql(
+  schemaName: string,
+  dialect: DatabaseType = 'sqlite'
+): string {
+  const safeSchema = cleanIdentifier(schemaName) || 'public';
+  if (dialect === 'sqlserver') {
+    return `CREATE OR ALTER VIEW [${safeSchema}].[new_view]\nAS\nSELECT\n  *\nFROM [${safeSchema}].[your_table];\n`;
+  }
+  if (dialect === 'oracle') {
+    return `CREATE OR REPLACE VIEW "${safeSchema.toUpperCase()}"."NEW_VIEW" AS\nSELECT\n  *\nFROM your_table;\n`;
+  }
+  if (dialect === 'postgres') {
+    return `CREATE OR REPLACE VIEW "${safeSchema}"."new_view" AS\nSELECT\n  *\nFROM "${safeSchema}"."your_table";\n`;
+  }
+  if (dialect === 'sqlite') {
+    return `CREATE VIEW IF NOT EXISTS \`new_view\` AS\nSELECT\n  *\nFROM \`your_table\`;\n`;
+  }
+  return `CREATE OR REPLACE VIEW \`${safeSchema}\`.\`new_view\` AS\nSELECT\n  *\nFROM \`${safeSchema}\`.\`your_table\`;\n`;
+}
+
+export function generateCreateProcedureTemplateSql(
+  schemaName: string,
+  dialect: DatabaseType = 'sqlite'
+): string {
+  const safeSchema = cleanIdentifier(schemaName) || 'public';
+  if (dialect === 'postgres') {
+    return `CREATE OR REPLACE PROCEDURE "${safeSchema}"."new_procedure"()\nLANGUAGE plpgsql\nAS $$\nBEGIN\n  -- Add statements here\nEND;\n$$;\n`;
+  }
+  if (dialect === 'sqlserver') {
+    return `CREATE OR ALTER PROCEDURE [${safeSchema}].[new_procedure]\nAS\nBEGIN\n  SET NOCOUNT ON;\n  -- Add statements here\nEND;\n`;
+  }
+  if (dialect === 'oracle') {
+    return `CREATE OR REPLACE PROCEDURE "${safeSchema.toUpperCase()}"."NEW_PROCEDURE" AS\nBEGIN\n  -- Add statements here\n  NULL;\nEND;\n`;
+  }
+  if (dialect === 'mysql' || dialect === 'mariadb') {
+    return `CREATE PROCEDURE \`${safeSchema}\`.\`new_procedure\`()\nBEGIN\n  -- Add statements here\nEND;\n`;
+  }
+  return `-- Create procedure template\nCREATE PROCEDURE new_procedure()\nBEGIN\n  -- Add statements here\nEND;\n`;
+}

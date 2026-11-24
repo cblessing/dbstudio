@@ -14,6 +14,10 @@ import {
 } from '../../utils/connectionProfiles';
 import { isNetworkDatabaseType } from '../../utils/liveBridge';
 import {
+  generateCreateViewTemplateSql,
+  generateCreateProcedureTemplateSql,
+} from '../../utils/tableManagement';
+import {
   Table,
   Eye,
   Cpu,
@@ -110,7 +114,8 @@ export function buildTableContextMenuItems(
 export function buildViewContextMenuItems(
   connId: string,
   vw: ViewDefinition,
-  cb: NavigatorMenuCallbacks
+  cb: NavigatorMenuCallbacks,
+  dialect: DatabaseType = 'sqlite'
 ): ContextMenuItem[] {
   return [
     {
@@ -131,13 +136,21 @@ export function buildViewContextMenuItems(
       icon: <Copy className="w-3.5 h-3.5 text-zinc-400" />,
       action: () => navigator.clipboard.writeText(vw.name),
     },
+    { id: 'div_new_view', isDivider: true, label: '' },
+    {
+      id: 'create_new_view',
+      label: 'Create New View',
+      icon: <Plus className="w-3.5 h-3.5 text-emerald-400" />,
+      action: () => cb.onOpenSqlEditor(connId, generateCreateViewTemplateSql(vw.schema ?? 'public', dialect)),
+    },
   ];
 }
 
 export function buildProcedureContextMenuItems(
   connId: string,
   proc: ProcedureDefinition,
-  cb: NavigatorMenuCallbacks
+  cb: NavigatorMenuCallbacks,
+  dialect: DatabaseType = 'sqlite'
 ): ContextMenuItem[] {
   return [
     {
@@ -157,6 +170,45 @@ export function buildProcedureContextMenuItems(
       label: `Copy Procedure Name ("${proc.name}")`,
       icon: <Copy className="w-3.5 h-3.5 text-zinc-400" />,
       action: () => navigator.clipboard.writeText(proc.name),
+    },
+    { id: 'div_new_proc', isDivider: true, label: '' },
+    {
+      id: 'create_new_procedure',
+      label: 'Create New Procedure',
+      icon: <Plus className="w-3.5 h-3.5 text-amber-400" />,
+      action: () => cb.onOpenSqlEditor(connId, generateCreateProcedureTemplateSql(proc.schema ?? 'public', dialect)),
+    },
+  ];
+}
+
+export function buildViewsGroupContextMenuItems(
+  connId: string,
+  schemaName: string,
+  dialect: DatabaseType,
+  cb: NavigatorMenuCallbacks
+): ContextMenuItem[] {
+  return [
+    {
+      id: 'create_new_view',
+      label: 'Create New View',
+      icon: <Plus className="w-3.5 h-3.5 text-emerald-400" />,
+      action: () => cb.onOpenSqlEditor(connId, generateCreateViewTemplateSql(schemaName, dialect)),
+    },
+  ];
+}
+
+export function buildProceduresGroupContextMenuItems(
+  connId: string,
+  schemaName: string,
+  dialect: DatabaseType,
+  cb: NavigatorMenuCallbacks
+): ContextMenuItem[] {
+  return [
+    {
+      id: 'create_new_procedure',
+      label: 'Create New Procedure',
+      icon: <Plus className="w-3.5 h-3.5 text-amber-400" />,
+      action: () => cb.onOpenSqlEditor(connId, generateCreateProcedureTemplateSql(schemaName, dialect)),
     },
   ];
 }
