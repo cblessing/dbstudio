@@ -7,15 +7,17 @@ interface ExplainPlanViewProps {
 }
 
 function getStepCardClass(operation: string): string {
-  if (operation.includes('JOIN')) return 'bg-purple-950/20 border-purple-800/40 text-purple-200';
-  if (operation.includes('INDEX')) return 'bg-emerald-950/20 border-emerald-800/40 text-emerald-200';
-  if (operation.includes('SCAN')) return 'bg-blue-950/20 border-blue-800/40 text-blue-200';
+  const upper = operation.toUpperCase();
+  if (upper.includes('JOIN')) return 'bg-purple-950/20 border-purple-800/40 text-purple-200';
+  if (upper.includes('INDEX')) return 'bg-emerald-950/20 border-emerald-800/40 text-emerald-200';
+  if (upper.includes('SCAN')) return 'bg-blue-950/20 border-blue-800/40 text-blue-200';
   return 'bg-[#252526] border-[#3c3c3c] text-[#cccccc]';
 }
 
 function getStepIcon(operation: string): React.ReactNode {
-  if (operation.includes('JOIN')) return <GitCommit className="w-4 h-4 text-purple-400" />;
-  if (operation.includes('INDEX')) return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+  const upper = operation.toUpperCase();
+  if (upper.includes('JOIN')) return <GitCommit className="w-4 h-4 text-purple-400" />;
+  if (upper.includes('INDEX')) return <CheckCircle className="w-4 h-4 text-emerald-400" />;
   return <Layers className="w-4 h-4 text-blue-400" />;
 }
 

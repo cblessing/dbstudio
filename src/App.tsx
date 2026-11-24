@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DatabaseConnection, EditorTab, QueryResult, TableDefinition } from './types/database';
 import { databaseManager } from './engine/databaseManager';
+import { generateExecutionPlan } from './engine/sqlEngineCore';
 import { StatusBar } from './components/vscode/StatusBar';
 import {
   StandaloneTabBar,
@@ -34,6 +35,8 @@ import {
 
 let nextTabId = 2;
 const createTabId = (prefix: string) => `${prefix}_${nextTabId++}`;
+const withFallbackExplain = (res: QueryResult, query: string, explain?: boolean): QueryResult =>
+  explain && !res.error && !res.explainPlan?.length ? { ...res, explainPlan: generateExecutionPlan(query) } : res;
 
 export default function App() {
   const viewMode = getInjectedGlobal<VsCodeViewMode>('__VSCODE_VIEW_MODE__') || 'standalone';
@@ -158,7 +161,7 @@ export default function App() {
 
   const handleExecuteQuery = async (
     query: string,
-    options?: { offset?: number; batchSize?: number }
+    options?: { offset?: number; batchSize?: number; explain?: boolean }
   ): Promise<QueryResult> => {
     if (!activeConnection) {
       return { columns: [], rows: [], executionTimeMs: 0, fetchTimeMs: 0, rowCount: 0, query, error: 'No active database connection.' };
@@ -167,14 +170,11 @@ export default function App() {
     const timestamp = new Date().toLocaleTimeString();
 
     try {
-      const res = isNetworkDatabaseType(activeConnection.type)
+      const rawRes = isNetworkDatabaseType(activeConnection.type)
         ? await executeLiveQuery(activeConnection.id, query, options)
         : await databaseManager.executeQuery(query, options);
-      setExecutionStats({
-        lastTimeMs: res.executionTimeMs,
-        rowCount: res.rowCount,
-        isExecuting: false,
-      });
+      const res = withFallbackExplain(rawRes, query, options?.explain);
+      setExecutionStats({ lastTimeMs: res.executionTimeMs, rowCount: res.rowCount, isExecuting: false });
 
       setExecutionLogs((prev) => [
         `[${timestamp}] Executed: "${query.slice(0, 45)}..." in ${res.executionTimeMs}ms (${res.rowCount} rows)`,

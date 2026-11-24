@@ -24,6 +24,17 @@ export interface LiveQueryOptions {
   params?: unknown[];
   offset?: number;
   batchSize?: number;
+  explain?: boolean;
+}
+
+export interface LiveExecutionPlanStep {
+  id: number;
+  operation: string;
+  target?: string;
+  cost?: string;
+  rowsEstimate?: number;
+  details: string;
+  children?: LiveExecutionPlanStep[];
 }
 
 export interface LiveQueryResult {
@@ -35,6 +46,7 @@ export interface LiveQueryResult {
   affectedRows?: number;
   query: string;
   error?: string;
+  explainPlan?: LiveExecutionPlanStep[];
 }
 
 export interface LiveTestResult {

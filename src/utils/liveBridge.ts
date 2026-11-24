@@ -111,7 +111,7 @@ export function deleteLiveConnection(connectionId: string): Promise<{ deleted: b
 export function executeLiveQuery(
   connectionId: string,
   query: string,
-  options?: { params?: unknown[]; offset?: number; batchSize?: number }
+  options?: { params?: unknown[]; offset?: number; batchSize?: number; explain?: boolean }
 ): Promise<QueryResult> {
   return invokeLiveRpc<QueryResult>('executeLiveQuery', { connectionId, query, options }, 30000);
 }

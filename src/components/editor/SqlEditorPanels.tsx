@@ -175,8 +175,9 @@ export function SqlEditorToolbar({
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={onExplain}
-          className="flex items-center gap-1 px-2 py-1 bg-[#333333] hover:bg-[#3c3c3c] text-[#cccccc] hover:text-white rounded transition-colors"
-          title="Explain Query Execution Plan"
+          disabled={isExecuting || !hasConnection}
+          className="flex items-center gap-1 px-2 py-1 bg-[#333333] hover:bg-[#3c3c3c] disabled:opacity-50 disabled:cursor-not-allowed text-[#cccccc] hover:text-white rounded transition-colors"
+          title={hasConnection ? 'Execute Query and Show Execution Plan' : 'Connect to a database first'}
           aria-label="Explain"
         >
           <GitCommit className="w-3.5 h-3.5 text-purple-400" />

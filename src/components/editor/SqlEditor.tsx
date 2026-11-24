@@ -17,7 +17,7 @@ interface SqlEditorProps {
   initialQuery?: string;
   onExecuteQuery: (
     query: string,
-    options?: { offset?: number; batchSize?: number }
+    options?: { offset?: number; batchSize?: number; explain?: boolean }
   ) => Promise<QueryResult>;
   connectionName: string;
   databaseName: string;
@@ -144,21 +144,28 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
     return savedSel ? savedSel : query.trim();
   };
 
-  const applyQueryOutcome = (res: QueryResult, runId: number) => {
+  const applyQueryOutcome = (
+    res: QueryResult,
+    runId: number,
+    targetTab: 'grid' | 'explain' = 'grid'
+  ) => {
     if (activeRunIdRef.current !== runId) return;
     setResult(res);
-    setActiveBottomTab(res.error ? 'messages' : 'grid');
+    setActiveBottomTab(res.error ? 'messages' : targetTab);
   };
 
-  const runQuery = async (queryToRun?: string) => {
+  const runQuery = async (queryToRun?: string, targetTab: 'grid' | 'explain' = 'grid') => {
     const targetQuery = getQueryToExecute(queryToRun);
     if (!targetQuery) return;
     const runId = ++activeRunIdRef.current;
     setIsExecuting(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 15));
-      const res = await onExecuteQuery(targetQuery);
-      applyQueryOutcome(res, runId);
+      const res = await onExecuteQuery(
+        targetQuery,
+        targetTab === 'explain' ? { explain: true } : undefined
+      );
+      applyQueryOutcome(res, runId, targetTab);
     } catch (err: any) {
       applyQueryOutcome(
         {
@@ -170,7 +177,8 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
           query: targetQuery,
           error: err ? String(err.message || err) : 'Execution error',
         },
-        runId
+        runId,
+        targetTab
       );
     } finally {
       if (activeRunIdRef.current === runId) {
@@ -332,10 +340,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
         hasConnection={Boolean(currentConnection)}
         onRun={() => runQuery()}
         onStop={stopQuery}
-        onExplain={async () => {
-          await runQuery();
-          setActiveBottomTab('explain');
-        }}
+        onExplain={() => runQuery(undefined, 'explain')}
         onFormat={() => {
           setQuery(formatSql(query));
           setCompletionResult(null);

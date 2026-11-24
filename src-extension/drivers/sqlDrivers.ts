@@ -2,6 +2,7 @@ import * as https from 'https';
 import {
   LiveConnectionConfig,
   LiveDatabaseDriver,
+  LiveExecutionPlanStep,
   LiveQueryResult,
   LiveSchemaTable,
   LiveTestResult,
@@ -9,6 +10,14 @@ import {
   loadOptionalDriver,
   sanitizeErrorMessage,
 } from './types';
+import {
+  isExplainableSql,
+  stripTrailingSemicolon,
+  parsePostgresExplainJson,
+  parseMysqlExplainRows,
+  parseClickHouseExplainRows,
+  parseTextExplainLines,
+} from './explainParser';
 
 function groupSchemaRows(
   rows: Array<{ table_name: string; column_name: string; data_type: string; is_nullable?: string }>,
@@ -35,6 +44,72 @@ function groupSchemaRows(
 
 function buildTlsOption(config: LiveConnectionConfig): { rejectUnauthorized: boolean } | undefined {
   return config.ssl ? { rejectUnauthorized: config.rejectUnauthorized } : undefined;
+}
+
+async function fetchPostgresExplain(
+  client: any,
+  query: string,
+  params?: unknown[]
+): Promise<LiveExecutionPlanStep[] | undefined> {
+  try {
+    const res = await client.query(`EXPLAIN (FORMAT JSON) ${stripTrailingSemicolon(query)}`, params);
+    const raw = res.rows?.[0]?.['QUERY PLAN'];
+    const steps = parsePostgresExplainJson(raw);
+    return steps.length > 0 ? steps : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchMysqlExplain(
+  conn: any,
+  query: string,
+  params?: unknown[]
+): Promise<LiveExecutionPlanStep[] | undefined> {
+  try {
+    const [rows] = await conn.execute(`EXPLAIN ${stripTrailingSemicolon(query)}`, params ?? []);
+    const steps = Array.isArray(rows) ? parseMysqlExplainRows(rows) : [];
+    return steps.length > 0 ? steps : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchOracleExplain(
+  conn: any,
+  oracledb: any,
+  normalizedSql: string
+): Promise<LiveExecutionPlanStep[] | undefined> {
+  try {
+    await conn.execute(`EXPLAIN PLAN FOR ${normalizedSql}`, [], { autoCommit: true });
+    const res = await conn.execute(
+      'SELECT plan_table_output FROM TABLE(DBMS_XPLAN.DISPLAY)',
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+    const lines = (res.rows ?? []).map((r: any) => String(r.PLAN_TABLE_OUTPUT ?? ''));
+    const steps = parseTextExplainLines(lines, 'ORACLE PLAN');
+    return steps.length > 0 ? steps : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchClickHouseExplain(
+  client: any,
+  query: string
+): Promise<LiveExecutionPlanStep[] | undefined> {
+  try {
+    const rs = await client.query({
+      query: `EXPLAIN ${stripTrailingSemicolon(query)}`,
+      format: 'JSONEachRow',
+    });
+    const rows = (await rs.json()) as Record<string, unknown>[];
+    const steps = parseClickHouseExplainRows(rows);
+    return steps.length > 0 ? steps : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function withPgClient<T>(
@@ -88,7 +163,11 @@ export const postgresDriver: LiveDatabaseDriver = {
       const res = await client.query(query, options?.params);
       const columns = (res.fields ?? []).map((f: any) => String(f.name));
       const rows = Array.isArray(res.rows) ? res.rows : [];
-      return buildRowsQueryResult(query, columns, rows, start, res.rowCount ?? undefined);
+      const result = buildRowsQueryResult(query, columns, rows, start, res.rowCount ?? undefined);
+      if (options?.explain && isExplainableSql(query)) {
+        result.explainPlan = await fetchPostgresExplain(client, query, options?.params);
+      }
+      return result;
     });
   },
 
@@ -127,6 +206,26 @@ async function withMysqlConn<T>(
   }
 }
 
+function buildMysqlQueryResult(
+  query: string,
+  result: any,
+  fields: any,
+  start: number
+): LiveQueryResult {
+  if (Array.isArray(result)) {
+    const columns = Array.isArray(fields) ? fields.map((f: any) => String(f.name)) : [];
+    return buildRowsQueryResult(query, columns, result, start);
+  }
+  const affected = Number(result?.affectedRows ?? 0);
+  return buildRowsQueryResult(
+    query,
+    ['status', 'affectedRows'],
+    [{ status: 'OK', affectedRows: affected }],
+    start,
+    affected
+  );
+}
+
 export const mysqlDriver: LiveDatabaseDriver = {
   async testConnection(config, password): Promise<LiveTestResult> {
     const start = performance.now();
@@ -142,12 +241,11 @@ export const mysqlDriver: LiveDatabaseDriver = {
     const start = performance.now();
     return withMysqlConn(config, password, async (conn) => {
       const [result, fields] = await conn.execute(query, options?.params ?? []);
-      if (Array.isArray(result)) {
-        const columns = Array.isArray(fields) ? fields.map((f: any) => String(f.name)) : [];
-        return buildRowsQueryResult(query, columns, result, start);
+      const queryResult = buildMysqlQueryResult(query, result, fields, start);
+      if (options?.explain && isExplainableSql(query)) {
+        queryResult.explainPlan = await fetchMysqlExplain(conn, query, options?.params);
       }
-      const affected = Number(result?.affectedRows ?? 0);
-      return buildRowsQueryResult(query, ['status', 'affectedRows'], [{ status: 'OK', affectedRows: affected }], start, affected);
+      return queryResult;
     });
   },
 
@@ -269,7 +367,11 @@ export const oracleDriver: LiveDatabaseDriver = {
       });
       const columns = (res.metaData ?? []).map((m: any) => String(m.name));
       const rows = Array.isArray(res.rows) ? res.rows : [];
-      return buildRowsQueryResult(query, columns, rows, start, res.rowsAffected);
+      const result = buildRowsQueryResult(query, columns, rows, start, res.rowsAffected);
+      if (options?.explain && isExplainableSql(normalizedSql)) {
+        result.explainPlan = await fetchOracleExplain(conn, oracledb, normalizedSql);
+      }
+      return result;
     });
   },
 
@@ -324,7 +426,7 @@ export const clickhouseDriver: LiveDatabaseDriver = {
     }
   },
 
-  async executeQuery(config, password, query): Promise<LiveQueryResult> {
+  async executeQuery(config, password, query, options): Promise<LiveQueryResult> {
     const start = performance.now();
     const client = createClickHouseClient(config, password);
     try {
@@ -336,7 +438,11 @@ export const clickhouseDriver: LiveDatabaseDriver = {
       const rs = await client.query({ query, format: 'JSONEachRow' });
       const rows = (await rs.json()) as Record<string, unknown>[];
       const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
-      return buildRowsQueryResult(query, columns, rows, start);
+      const result = buildRowsQueryResult(query, columns, rows, start);
+      if (options?.explain && isExplainableSql(query)) {
+        result.explainPlan = await fetchClickHouseExplain(client, query);
+      }
+      return result;
     } finally {
       await client.close().catch(() => {});
     }
