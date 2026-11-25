@@ -5,9 +5,9 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches: [main, pre-release]
   pull_request:
-    branches: [main]
+    branches: [main, pre-release]
 
 jobs:
   verify:
@@ -38,3 +38,83 @@ jobs:
 
       - name: Run unit tests
         run: npm test
+
+  publish:
+    name: Package & Publish to VS Code Marketplace
+    needs: verify
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/pre-release')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check if version is already published
+        id: check_version
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const { execFileSync } = require("node:child_process");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const extId = `${pkg.publisher}.${pkg.name}`;
+            let published = false;
+            try {
+              const out = execFileSync("npx", ["--yes", "@vscode/vsce", "show", extId, "--json"], {
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "ignore"],
+              });
+              const data = JSON.parse(out);
+              const versions = Array.isArray(data.versions) ? data.versions : [];
+              published = versions.some((v) => v && v.version === pkg.version);
+            } catch {
+              published = false;
+            }
+            const outFile = process.env.GITHUB_OUTPUT;
+            fs.appendFileSync(outFile, `version=${pkg.version}\n`);
+            fs.appendFileSync(outFile, `already_published=${published}\n`);
+            console.log(`Extension ${extId} v${pkg.version}: already_published=${published}`);
+          '
+
+      - name: Build frontend & VS Code extension
+        if: steps.check_version.outputs.already_published != 'true'
+        run: npm run build
+
+      - name: Package VSIX
+        id: package
+        if: steps.check_version.outputs.already_published != 'true'
+        run: |
+          VSIX_NAME="database-studio-vscode-${{ steps.check_version.outputs.version }}.vsix"
+          if [ "${{ github.ref_name }}" = "pre-release" ]; then
+            npx --yes @vscode/vsce package --pre-release --no-dependencies -o "$VSIX_NAME"
+          else
+            npx --yes @vscode/vsce package --no-dependencies -o "$VSIX_NAME"
+          fi
+          echo "vsix_file=$VSIX_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload VSIX artifact
+        if: steps.check_version.outputs.already_published != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-studio-vscode-${{ steps.check_version.outputs.version }}
+          path: ${{ steps.package.outputs.vsix_file }}
+
+      - name: Publish VSIX to VS Code Marketplace (OIDC)
+        if: steps.check_version.outputs.already_published != 'true'
+        run: |
+          if [ "${{ github.ref_name }}" = "pre-release" ]; then
+            npx --yes @vscode/vsce@latest publish --oidc --pre-release --packagePath "${{ steps.package.outputs.vsix_file }}"
+          else
+            npx --yes @vscode/vsce@latest publish --oidc --packagePath "${{ steps.package.outputs.vsix_file }}"
+          fi
