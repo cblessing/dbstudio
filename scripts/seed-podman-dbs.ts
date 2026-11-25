@@ -92,6 +92,33 @@ const MYSQL_STATEMENTS = [
     (1003, 3, 102, 'processing', 79.50)`,
 ];
 
+const MARIADB_LARGE_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS sales_events (
+    id INT PRIMARY KEY,
+    event_code VARCHAR(32) NOT NULL,
+    customer_name VARCHAR(100) NOT NULL,
+    region VARCHAR(40) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    status VARCHAR(20) NOT NULL
+  )`,
+  `INSERT IGNORE INTO sales_events (id, event_code, customer_name, region, amount, status)
+   SELECT
+     n,
+     CONCAT('EVT-', LPAD(n, 5, '0')),
+     CONCAT('Customer ', n),
+     ELT((n % 4) + 1, 'North', 'South', 'East', 'West'),
+     ROUND(10 + ((n * 37) % 490) + ((n % 99) / 100), 2),
+     ELT((n % 3) + 1, 'completed', 'pending', 'shipped')
+   FROM (
+     SELECT a.d + b.d * 10 + c.d * 100 + d.d * 1000 + 1 AS n
+     FROM (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) a
+     CROSS JOIN (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) b
+     CROSS JOIN (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) c
+     CROSS JOIN (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3) d
+   ) nums
+   WHERE n <= 3500`,
+];
+
 const MSSQL_STATEMENTS = [
   `IF OBJECT_ID(N'dbo.customers', N'U') IS NULL
    CREATE TABLE dbo.customers (
@@ -210,7 +237,11 @@ function buildSeedTargets(pwd: string) {
     },
     {
       config: { id: 'seed_mariadb', type: 'mariadb', host: '127.0.0.1', port: 3307, database: 'dbstudio', username: 'root', ssl: true, rejectUnauthorized: false },
-      statements: MYSQL_STATEMENTS,
+      statements: [...MYSQL_STATEMENTS, `CREATE DATABASE IF NOT EXISTS dbstudio_large`],
+    },
+    {
+      config: { id: 'seed_mariadb_large', type: 'mariadb', host: '127.0.0.1', port: 3307, database: 'dbstudio_large', username: 'root', ssl: true, rejectUnauthorized: false },
+      statements: MARIADB_LARGE_STATEMENTS,
     },
     {
       config: { id: 'seed_mssql_init', type: 'sqlserver', host: '127.0.0.1', port: 1433, database: 'master', username: 'sa', ssl: true, rejectUnauthorized: false },

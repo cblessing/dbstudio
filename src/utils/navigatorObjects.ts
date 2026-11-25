@@ -11,6 +11,17 @@ export function quoteDialectIdentifier(name: string, dialect: DatabaseType): str
   return `\`${cleaned}\``;
 }
 
+export function buildLiveTableFetchSql(
+  tableName: string,
+  dialect: DatabaseType,
+  offset = 0
+): string {
+  if (dialect === 'mongodb' || dialect === 'redis') {
+    return generateSelectTableSql(tableName, dialect, 1000, offset);
+  }
+  return `SELECT * FROM ${quoteDialectIdentifier(tableName, dialect)}`;
+}
+
 export function generateSelectTableSql(
   tableName: string,
   dialect: DatabaseType,

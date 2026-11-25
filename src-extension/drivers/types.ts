@@ -59,6 +59,8 @@ export interface LiveQueryResult {
   query: string;
   error?: string;
   explainPlan?: LiveExecutionPlanStep[];
+  hasMore?: boolean;
+  nextOffset?: number;
 }
 
 export interface LiveTestResult {

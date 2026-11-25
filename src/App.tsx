@@ -16,7 +16,7 @@ import { TableDetailsView } from './components/views/TableDetailsView';
 import { ERDiagramViewer } from './components/diagram/ERDiagramViewer';
 import { generateDropTableSql, generateTruncateTableSql, generateDropColumnSql } from './utils/tableManagement';
 import { downloadFile, formatSqlValue, postVsCodeMessage } from './utils/exportData';
-import { generateSelectTableSql, quoteDialectIdentifier } from './utils/navigatorObjects';
+import { buildLiveTableFetchSql, quoteDialectIdentifier } from './utils/navigatorObjects';
 import { executeLiveQuery, isNetworkDatabaseType } from './utils/liveBridge';
 import { useConnectionActions } from './hooks/useConnectionActions';
 import {
@@ -199,10 +199,9 @@ export default function App() {
 
   const handleFetchTableData = async (tableName: string, offset = 0): Promise<QueryResult> => {
     const conn = tabConnection ?? activeConnection;
-    if (conn && isNetworkDatabaseType(conn.type)) {
-      return executeLiveQuery(conn.id, generateSelectTableSql(tableName, conn.type, 1000, offset));
-    }
-    return databaseManager.getTableData(tableName, 1000, offset);
+    return conn && isNetworkDatabaseType(conn.type)
+      ? executeLiveQuery(conn.id, buildLiveTableFetchSql(tableName, conn.type, offset), { offset, batchSize: 1000 })
+      : databaseManager.getTableData(tableName, 1000, offset);
   };
 
   const getActiveTableName = () => (activeTab.tableName ? activeTab.tableName : 'customers');

@@ -18,6 +18,11 @@ import {
 } from './sqlDrivers';
 import { mongodbDriver, redisDriver } from './nosqlDrivers';
 import { withSshTunnel } from './sshTunnel';
+import {
+  DEFAULT_LIVE_BATCH_SIZE,
+  applyLivePagination,
+  finalizePaginatedResult,
+} from './queryPagination';
 
 export interface SecretStoreLike {
   get(key: string): Thenable<string | undefined> | Promise<string | undefined>;
@@ -173,10 +178,14 @@ export class LiveConnectionService {
       this.sessionSshSecrets,
       sshSecretKeyFor
     );
+    const batchSize = options?.batchSize ?? DEFAULT_LIVE_BATCH_SIZE;
+    const offset = options?.offset ?? 0;
+    const { effectiveQuery, paginated } = applyLivePagination(query, config.type, batchSize, offset);
     try {
-      return await withSshTunnel(config, sshSecret, (effectiveConfig) =>
-        driver.executeQuery(effectiveConfig, password, query, options)
+      const raw = await withSshTunnel(config, sshSecret, (effectiveConfig) =>
+        driver.executeQuery(effectiveConfig, password, effectiveQuery, options)
       );
+      return finalizePaginatedResult(raw, query, paginated, batchSize, offset);
     } catch (err) {
       return {
         columns: [],

@@ -35,6 +35,17 @@
       "colorBadge": "#C0715D"
     },
     {
+      "name": "Local MariaDB (Large Dataset)",
+      "type": "mariadb",
+      "host": "127.0.0.1",
+      "port": 3307,
+      "database": "dbstudio_large",
+      "username": "root",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "colorBadge": "#9A4D3E"
+    },
+    {
       "name": "Local SQL Server",
       "type": "sqlserver",
       "host": "127.0.0.1",
