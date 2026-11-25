@@ -1,14 +1,54 @@
 import React, { useState } from 'react';
-import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RefreshCw, Server } from 'lucide-react';
 import { ParsedConnectionUri } from '../../utils/connectionUri';
 import { isNetworkDatabaseType } from '../../utils/liveBridge';
 import {
+  CollapsibleCard,
   ConnectionFormState,
   GeneralCard,
   ServerAuthCard,
   SecurityTlsCard,
 } from './ConnectionFormCards';
 import { SshTunnelCard } from './SshTunnelCard';
+
+function EmbeddedDatabaseCard({
+  form,
+  isOpen,
+  onToggle,
+  onChange,
+}: {
+  form: ConnectionFormState;
+  isOpen: boolean;
+  onToggle: () => void;
+  onChange: (patch: Partial<ConnectionFormState>) => void;
+}) {
+  return (
+    <CollapsibleCard
+      title="Local Database"
+      icon={<Server className="w-3.5 h-3.5 text-amber-400" />}
+      badge={form.database || ':memory:'}
+      isOpen={isOpen}
+      onToggle={onToggle}
+    >
+      <div>
+        <label htmlFor="conn_embedded_db_input" className="block text-[#a1a1aa] mb-1 font-medium">
+          Database File / Name
+        </label>
+        <input
+          id="conn_embedded_db_input"
+          type="text"
+          value={form.database}
+          onChange={(e) => onChange({ database: e.target.value })}
+          placeholder=":memory: or local_database.db"
+          className="w-full bg-[#19191b] border border-[#3a3a3e] focus:border-[#007acc] focus:ring-2 focus:ring-[#007acc]/30 rounded px-2.5 py-1.5 text-[#f1f1f1] placeholder-[#6e6e73] outline-none transition-all text-xs font-mono"
+        />
+        <p className="text-[11px] text-[#8e8e93] mt-1">
+          Runs locally in-process with preloaded sample tables and views.
+        </p>
+      </div>
+    </CollapsibleCard>
+  );
+}
 
 export type { ConnectionFormState };
 
@@ -85,28 +125,37 @@ export function ConnectionConfigStep({
         onChangeDriver={onChangeDriver}
       />
 
-      <ServerAuthCard
-        form={form}
-        isEditing={isEditing}
-        isOpen={openSections.server}
-        onToggle={() => toggleSection('server')}
-        onChange={onChange}
-        onApplyUri={onApplyUri}
-        onResolveSavedPassword={onResolveSavedPassword}
-      />
+      {isNetwork ? (
+        <>
+          <ServerAuthCard
+            form={form}
+            isEditing={isEditing}
+            isOpen={openSections.server}
+            onToggle={() => toggleSection('server')}
+            onChange={onChange}
+            onApplyUri={onApplyUri}
+            onResolveSavedPassword={onResolveSavedPassword}
+          />
 
-      <SecurityTlsCard
-        form={form}
-        isOpen={openSections.security}
-        onToggle={() => toggleSection('security')}
-        onChange={onChange}
-      />
+          <SecurityTlsCard
+            form={form}
+            isOpen={openSections.security}
+            onToggle={() => toggleSection('security')}
+            onChange={onChange}
+          />
 
-      {isNetwork && (
-        <SshTunnelCard
+          <SshTunnelCard
+            form={form}
+            isOpen={openSections.ssh}
+            onToggle={() => toggleSection('ssh')}
+            onChange={onChange}
+          />
+        </>
+      ) : (
+        <EmbeddedDatabaseCard
           form={form}
-          isOpen={openSections.ssh}
-          onToggle={() => toggleSection('ssh')}
+          isOpen={openSections.server}
+          onToggle={() => toggleSection('server')}
           onChange={onChange}
         />
       )}

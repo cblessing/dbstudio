@@ -228,41 +228,18 @@ function ConnectionUriField({
   );
 }
 
-function resolvePasswordDisplay(
-  value: string,
-  isEditing: boolean,
-  showPassword: boolean,
-  isFocused: boolean
-): { inputType: 'text' | 'password'; displayValue: string; placeholder: string } {
-  const showMaskedStars = !showPassword && !isFocused && (Boolean(value) || isEditing);
-  return {
-    inputType: showPassword || showMaskedStars ? 'text' : 'password',
-    displayValue: showMaskedStars ? '*******' : value,
-    placeholder: showPassword ? 'Enter password' : '*******',
-  };
-}
-
 function PasswordField({
   value,
-  isEditing,
   label,
   onChange,
   onResolveSavedPassword,
 }: {
   value: string;
-  isEditing: boolean;
   label: string;
   onChange: (password: string) => void;
   onResolveSavedPassword?: () => Promise<string>;
 }) {
   const [showPassword, setShowPassword] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
-  const { inputType, displayValue, placeholder } = resolvePasswordDisplay(
-    value,
-    isEditing,
-    showPassword,
-    isFocused
-  );
   const toggleLabel = showPassword ? 'Hide password' : 'Show password';
 
   const handleToggleShow = async () => {
@@ -282,12 +259,11 @@ function PasswordField({
       <div className="relative">
         <input
           id="conn_pwd_input"
-          type={inputType}
-          value={displayValue}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          type={showPassword ? 'text' : 'password'}
+          value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
+          placeholder="Enter password"
+          autoComplete="current-password"
           className={`${INPUT_CLASS} font-mono pr-9`}
         />
         <button
@@ -399,7 +375,6 @@ export function ServerAuthCard({
 
         <PasswordField
           value={form.password}
-          isEditing={isEditing}
           label={labels.passwordLabel}
           onChange={(password) => onChange({ password })}
           onResolveSavedPassword={onResolveSavedPassword}

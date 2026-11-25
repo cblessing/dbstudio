@@ -5,7 +5,7 @@ import {
   DatabaseType,
   SshTunnelConfig,
 } from '../../types/database';
-import { DATABASE_DRIVERS } from '../../engine/sqlEngineCore';
+import { DATABASE_DRIVERS, buildDefaultSchemaForType } from '../../engine/sqlEngineCore';
 import { groupTablesIntoSchemas } from '../../utils/connectionProfiles';
 import {
   isNetworkDatabaseType,
@@ -320,6 +320,19 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
   }
 
   useEffect(() => {
+    if (!isOpen || !editingConnection || !isNetworkDatabaseType(editingConnection.type)) return;
+    let active = true;
+    void getLiveConnectionPassword(editingConnection.id)
+      .then((saved) => {
+        if (active && saved) setForm((prev) => (prev.password ? prev : { ...prev, password: saved }));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isOpen, editingConnection]);
+
+  useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -378,10 +391,11 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
     setIsSaving(true);
 
     const connId = editingConnection ? editingConnection.id : `conn_${Date.now()}_${form.selectedDriver.id}`;
-    const emptySchemaName = defaultSchemaNameFor(form.selectedDriver.id, form.database);
     let schemas: DatabaseConnection['schemas'] = editingConnection
       ? editingConnection.schemas
-      : [{ name: emptySchemaName, tables: [], views: [], procedures: [] }];
+      : isNetworkDriver
+      ? [{ name: defaultSchemaNameFor(form.selectedDriver.id, form.database), tables: [], views: [], procedures: [] }]
+      : [buildDefaultSchemaForType(form.selectedDriver.id)];
 
     if (isNetworkDriver) {
       try {

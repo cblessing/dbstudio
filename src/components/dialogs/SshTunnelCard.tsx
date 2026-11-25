@@ -38,6 +38,7 @@ function SshSecretInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
+          autoComplete="new-password"
           className={`${INPUT_CLASS} font-mono pr-9`}
         />
         <button
