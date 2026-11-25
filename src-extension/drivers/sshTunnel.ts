@@ -81,9 +81,13 @@ function startLocalForwardServer(
   sshClient: any,
   targetHost: string,
   targetPort: number
-): Promise<{ server: net.Server; localPort: number }> {
+): Promise<{ server: net.Server; localPort: number; sockets: Set<net.Socket> }> {
+  const sockets = new Set<net.Socket>();
   return new Promise((resolve, reject) => {
     const server = net.createServer((socket) => {
+      sockets.add(socket);
+      socket.once('close', () => sockets.delete(socket));
+      socket.on('error', () => {});
       sshClient.forwardOut(
         socket.remoteAddress || '127.0.0.1',
         socket.remotePort || 0,
@@ -91,7 +95,7 @@ function startLocalForwardServer(
         targetPort,
         (err: Error | undefined, stream: any) => {
           if (err) {
-            socket.destroy(err);
+            socket.destroy();
             return;
           }
           socket.pipe(stream).pipe(socket);
@@ -108,7 +112,7 @@ function startLocalForwardServer(
         reject(new Error('Failed to bind local SSH tunnel port.'));
         return;
       }
-      resolve({ server, localPort: addr.port });
+      resolve({ server, localPort: addr.port, sockets });
     });
   });
 }
@@ -124,14 +128,19 @@ export async function withSshTunnel<T>(
   const connectConfig = buildSshConnectConfig(config.ssh, sshSecret, config.timeoutMs ?? 10000);
   const sshClient = await connectSshClient(connectConfig);
   let server: net.Server | null = null;
+  let sockets: Set<net.Socket> | null = null;
   try {
     const started = await startLocalForwardServer(sshClient, config.host, config.port);
     server = started.server;
+    sockets = started.sockets;
     return await fn({ ...config, host: '127.0.0.1', port: started.localPort });
   } finally {
-    if (server) {
-      await new Promise<void>((res) => server!.close(() => res()));
+    if (sockets) {
+      for (const s of sockets) s.destroy();
     }
     sshClient.end();
+    if (server) {
+      server.close();
+    }
   }
 }

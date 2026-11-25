@@ -226,16 +226,36 @@ if (action === 'start') {
   process.exit(0);
 }
 
+const PODMAN_NETWORK = 'dbstudio-net';
+
+function ensurePodmanNetwork() {
+  try {
+    runPodman(['network', 'exists', PODMAN_NETWORK]);
+  } catch {
+    runPodman(['network', 'create', PODMAN_NETWORK]);
+  }
+}
+
 if (!fs.existsSync(path.join(certsDir, 'server.crt'))) {
   execFileSync('node', ['scripts/generate-dev-certs.mjs'], { stdio: 'inherit' });
 }
 if (services.some((s) => s.name === 'bastion')) {
   ensureBastionKey(certsDir);
 }
+ensurePodmanNetwork();
 
 for (const svc of services) {
   console.log(`Starting ${svc.container} (${svc.image})...`);
-  const args = ['run', '-d', '--replace', '--restart=unless-stopped', '--name', svc.container];
+  const args = [
+    'run',
+    '-d',
+    '--replace',
+    '--restart=unless-stopped',
+    '--network',
+    PODMAN_NETWORK,
+    '--name',
+    svc.container,
+  ];
   for (const p of svc.ports) args.push('-p', p);
   for (const v of svc.volumes) args.push('-v', v);
   for (const e of svc.env) args.push('-e', e);

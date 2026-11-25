@@ -92,7 +92,7 @@
     {
       "name": "Local PostgreSQL (Bastion)",
       "type": "postgres",
-      "host": "host.containers.internal",
+      "host": "dbstudio-postgres",
       "port": 5432,
       "database": "dbstudio",
       "username": "postgres",
@@ -111,8 +111,8 @@
     {
       "name": "Local MariaDB (Bastion)",
       "type": "mariadb",
-      "host": "host.containers.internal",
-      "port": 3307,
+      "host": "dbstudio-mariadb",
+      "port": 3306,
       "database": "dbstudio",
       "username": "root",
       "ssl": true,
@@ -130,7 +130,7 @@
     {
       "name": "Local Oracle (Bastion)",
       "type": "oracle",
-      "host": "host.containers.internal",
+      "host": "dbstudio-oracle",
       "port": 1521,
       "database": "FREEPDB1",
       "username": "dbstudio",
