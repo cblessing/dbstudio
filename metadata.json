@@ -1,6 +1,0 @@
-{
-  "name": "Database Studio for VS Code — WebAssembly Edition",
-  "description": "High-performance WebAssembly database client for VS Code with universal database support, visual query runner, interactive ER diagrams, and editable data grid.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
