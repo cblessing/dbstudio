@@ -17,6 +17,7 @@ import {
   clickhouseDriver,
 } from './sqlDrivers';
 import { mongodbDriver, redisDriver } from './nosqlDrivers';
+import { withSshTunnel } from './sshTunnel';
 
 export interface SecretStoreLike {
   get(key: string): Thenable<string | undefined> | Promise<string | undefined>;
@@ -41,9 +42,14 @@ function secretKeyFor(connectionId: string): string {
   return `${SECRET_KEY_PREFIX}${connectionId}.password`;
 }
 
+function sshSecretKeyFor(connectionId: string): string {
+  return `${SECRET_KEY_PREFIX}${connectionId}.sshSecret`;
+}
+
 export class LiveConnectionService {
   private readonly configs = new Map<string, LiveConnectionConfig>();
   private readonly sessionPasswords = new Map<string, string>();
+  private readonly sessionSshSecrets = new Map<string, string>();
   private readonly drivers: Record<LiveDriverType, LiveDatabaseDriver>;
 
   constructor(
@@ -53,7 +59,11 @@ export class LiveConnectionService {
     this.drivers = { ...DEFAULT_DRIVERS, ...drivers };
   }
 
-  public async saveConnection(rawConfig: unknown, password?: string): Promise<LiveConnectionConfig> {
+  public async saveConnection(
+    rawConfig: unknown,
+    password?: string,
+    sshSecret?: string
+  ): Promise<LiveConnectionConfig> {
     const validation = validateConnectionConfig(rawConfig);
     if ('error' in validation) {
       throw new Error(validation.error);
@@ -65,13 +75,19 @@ export class LiveConnectionService {
       this.sessionPasswords.set(config.id, password);
       await this.secrets.store(secretKeyFor(config.id), password);
     }
+    if (typeof sshSecret === 'string' && sshSecret.length > 0) {
+      this.sessionSshSecrets.set(config.id, sshSecret);
+      await this.secrets.store(sshSecretKeyFor(config.id), sshSecret);
+    }
     return config;
   }
 
   public async deleteConnection(connectionId: string): Promise<void> {
     this.configs.delete(connectionId);
     this.sessionPasswords.delete(connectionId);
+    this.sessionSshSecrets.delete(connectionId);
     await this.secrets.delete(secretKeyFor(connectionId));
+    await this.secrets.delete(sshSecretKeyFor(connectionId));
   }
 
   public hasConnection(connectionId: string): boolean {
@@ -79,20 +95,26 @@ export class LiveConnectionService {
   }
 
   public async getPassword(connectionId: string): Promise<string> {
-    return this.resolvePassword(connectionId);
+    return this.resolveSecret(connectionId, this.sessionPasswords, secretKeyFor);
   }
 
-  private async resolvePassword(connectionId: string, overridePassword?: string): Promise<string> {
-    if (typeof overridePassword === 'string' && overridePassword.length > 0) {
-      return overridePassword;
-    }
-    const cached = this.sessionPasswords.get(connectionId);
+  private async resolveSecret(
+    connectionId: string,
+    cache: Map<string, string>,
+    keyFn: (id: string) => string,
+    override?: string
+  ): Promise<string> {
+    if (typeof override === 'string' && override.length > 0) return override;
+    const cached = cache.get(connectionId);
     if (cached) return cached;
-    const stored = await this.secrets.get(secretKeyFor(connectionId));
-    return stored ?? '';
+    return (await this.secrets.get(keyFn(connectionId))) ?? '';
   }
 
-  public async testConnection(rawConfig: unknown, password?: string): Promise<LiveTestResult> {
+  public async testConnection(
+    rawConfig: unknown,
+    password?: string,
+    sshSecret?: string
+  ): Promise<LiveTestResult> {
     const validation = validateConnectionConfig(rawConfig);
     if ('error' in validation) {
       return { success: false, latencyMs: 0, message: validation.error };
@@ -100,10 +122,23 @@ export class LiveConnectionService {
 
     const { config } = validation;
     const driver = this.drivers[config.type];
-    const resolvedPassword = await this.resolvePassword(config.id, password);
+    const resolvedPassword = await this.resolveSecret(
+      config.id,
+      this.sessionPasswords,
+      secretKeyFor,
+      password
+    );
+    const resolvedSshSecret = await this.resolveSecret(
+      config.id,
+      this.sessionSshSecrets,
+      sshSecretKeyFor,
+      sshSecret
+    );
 
     try {
-      return await driver.testConnection(config, resolvedPassword);
+      return await withSshTunnel(config, resolvedSshSecret, (effectiveConfig) =>
+        driver.testConnection(effectiveConfig, resolvedPassword)
+      );
     } catch (err) {
       return {
         success: false,
@@ -132,9 +167,16 @@ export class LiveConnectionService {
     }
 
     const driver = this.drivers[config.type];
-    const password = await this.resolvePassword(connectionId);
+    const password = await this.resolveSecret(connectionId, this.sessionPasswords, secretKeyFor);
+    const sshSecret = await this.resolveSecret(
+      connectionId,
+      this.sessionSshSecrets,
+      sshSecretKeyFor
+    );
     try {
-      return await driver.executeQuery(config, password, query, options);
+      return await withSshTunnel(config, sshSecret, (effectiveConfig) =>
+        driver.executeQuery(effectiveConfig, password, query, options)
+      );
     } catch (err) {
       return {
         columns: [],
@@ -154,9 +196,16 @@ export class LiveConnectionService {
       throw new Error(`Live connection "${connectionId}" is not registered.`);
     }
     const driver = this.drivers[config.type];
-    const password = await this.resolvePassword(connectionId);
+    const password = await this.resolveSecret(connectionId, this.sessionPasswords, secretKeyFor);
+    const sshSecret = await this.resolveSecret(
+      connectionId,
+      this.sessionSshSecrets,
+      sshSecretKeyFor
+    );
     try {
-      return await driver.introspectSchema(config, password);
+      return await withSshTunnel(config, sshSecret, (effectiveConfig) =>
+        driver.introspectSchema(effectiveConfig, password)
+      );
     } catch (err) {
       throw new Error(sanitizeErrorMessage(err), { cause: err });
     }

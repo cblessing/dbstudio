@@ -1,4 +1,32 @@
-import { DatabaseDriverInfo, DatabaseType } from '../types/database';
+import {
+  DatabaseDriverInfo,
+  DatabaseType,
+  SshAuthMethod,
+  SshTunnelConfig,
+} from '../types/database';
+
+const DEFAULT_SSH_FORM_FIELDS = {
+  sshEnabled: false,
+  sshHost: '',
+  sshPort: 22,
+  sshUsername: '',
+  sshAuthMethod: 'privateKey' as SshAuthMethod,
+  sshPrivateKeyPath: '',
+  sshSecret: '',
+};
+
+export function toSshFormFields(ssh?: SshTunnelConfig) {
+  if (!ssh) return { ...DEFAULT_SSH_FORM_FIELDS };
+  return {
+    sshEnabled: Boolean(ssh.enabled),
+    sshHost: ssh.host || '',
+    sshPort: ssh.port || 22,
+    sshUsername: ssh.username || '',
+    sshAuthMethod: ssh.authMethod || 'privateKey',
+    sshPrivateKeyPath: ssh.privateKeyPath || '',
+    sshSecret: '',
+  };
+}
 
 export interface ConnectionFormState {
   selectedDriver: DatabaseDriverInfo;
@@ -11,6 +39,13 @@ export interface ConnectionFormState {
   password: string;
   ssl: boolean;
   allowSelfSigned: boolean;
+  sshEnabled: boolean;
+  sshHost: string;
+  sshPort: number;
+  sshUsername: string;
+  sshAuthMethod: SshAuthMethod;
+  sshPrivateKeyPath: string;
+  sshSecret: string;
   colorBadge: string;
 }
 

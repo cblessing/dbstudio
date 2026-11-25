@@ -19,6 +19,8 @@ const OPTIONAL_NATIVE_EXTERNALS = [
   'oci-secrets',
   '@azure/identity',
   '@azure/keyvault-secrets',
+  'cpu-features',
+  './crypto/build/Release/sshcrypto.node',
 ];
 
 async function main() {

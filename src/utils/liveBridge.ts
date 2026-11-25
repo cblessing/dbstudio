@@ -1,4 +1,4 @@
-import { DatabaseType, QueryResult, TableDefinition } from '../types/database';
+import { DatabaseType, QueryResult, SshTunnelConfig, TableDefinition } from '../types/database';
 import { postVsCodeMessage } from './exportData';
 
 export interface LiveConnectionPayload {
@@ -10,6 +10,7 @@ export interface LiveConnectionPayload {
   username: string;
   ssl: boolean;
   rejectUnauthorized: boolean;
+  ssh?: SshTunnelConfig;
 }
 
 export interface LiveTestResponse {
@@ -92,16 +93,18 @@ function invokeLiveRpc<T>(
 
 export function testLiveConnection(
   config: LiveConnectionPayload,
-  password: string
+  password: string,
+  sshSecret = ''
 ): Promise<LiveTestResponse> {
-  return invokeLiveRpc<LiveTestResponse>('testLiveConnection', { config, password });
+  return invokeLiveRpc<LiveTestResponse>('testLiveConnection', { config, password, sshSecret });
 }
 
 export function saveLiveConnection(
   config: LiveConnectionPayload,
-  password: string
+  password: string,
+  sshSecret = ''
 ): Promise<LiveConnectionPayload> {
-  return invokeLiveRpc<LiveConnectionPayload>('saveLiveConnection', { config, password });
+  return invokeLiveRpc<LiveConnectionPayload>('saveLiveConnection', { config, password, sshSecret });
 }
 
 export function deleteLiveConnection(connectionId: string): Promise<{ deleted: boolean }> {

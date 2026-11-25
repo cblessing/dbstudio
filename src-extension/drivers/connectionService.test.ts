@@ -6,6 +6,11 @@ import {
   sanitizeErrorMessage,
   validateConnectionConfig,
 } from './types';
+import {
+  buildSshConnectConfig,
+  expandHomePath,
+  resolveSshAgentSocket,
+} from './sshTunnel';
 
 function createMockSecretStore(): SecretStoreLike & { storeMap: Map<string, string> } {
   const storeMap = new Map<string, string>();
@@ -112,4 +117,62 @@ test('LiveConnectionService stores secrets in SecretStorage, passes them to driv
   assert.equal(secrets.storeMap.has('dbstudio.conn.conn_pg_live.password'), false);
   assert.equal(await service.getPassword('conn_pg_live'), '');
   assert.equal(service.hasConnection('conn_pg_live'), false);
+});
+
+test('validateConnectionConfig validates SSH bastion settings and LiveConnectionService manages sshSecret', async () => {
+  const badSsh = validateConnectionConfig({
+    id: 'conn_ssh_bad',
+    type: 'postgres',
+    host: '10.0.0.5',
+    port: 5432,
+    ssh: { enabled: true, host: 'bastion.internal', port: 22, username: '', authMethod: 'agent' },
+  });
+  assert.equal(badSsh.valid, false);
+
+  const okSsh = validateConnectionConfig({
+    id: 'conn_ssh_ok',
+    type: 'postgres',
+    host: '10.0.0.5',
+    port: 5432,
+    ssh: {
+      enabled: true,
+      host: '127.0.0.1',
+      port: 2222,
+      username: 'bastion',
+      authMethod: 'privateKey',
+      privateKeyPath: '~/.ssh/id_ed25519',
+    },
+  });
+  assert.equal(okSsh.valid, true);
+  if (okSsh.valid) {
+    assert.equal(okSsh.config.ssh?.port, 2222);
+    assert.equal(okSsh.config.ssh?.authMethod, 'privateKey');
+  }
+
+  assert.equal(resolveSshAgentSocket({}, 'win32'), '\\\\.\\pipe\\openssh-ssh-agent');
+  assert.equal(resolveSshAgentSocket({ SSH_AUTH_SOCK: '/tmp/agent.sock' }, 'linux'), '/tmp/agent.sock');
+  assert.ok(expandHomePath('~/.ssh/id_ed25519').endsWith('id_ed25519'));
+
+  const agentCfg = buildSshConnectConfig(
+    { enabled: true, host: '127.0.0.1', port: 2222, username: 'bastion', authMethod: 'agent' },
+    ''
+  );
+  assert.ok(typeof agentCfg.agent === 'string');
+
+  const secrets = createMockSecretStore();
+  const service = new LiveConnectionService(secrets);
+  await service.saveConnection(
+    {
+      id: 'conn_ssh_secret',
+      type: 'postgres',
+      host: '10.0.0.5',
+      port: 5432,
+      ssh: { enabled: true, host: '127.0.0.1', port: 2222, username: 'bastion', authMethod: 'password' },
+    },
+    'DbPass!',
+    'BastionPass!'
+  );
+  assert.equal(secrets.storeMap.get('dbstudio.conn.conn_ssh_secret.sshSecret'), 'BastionPass!');
+  await service.deleteConnection('conn_ssh_secret');
+  assert.equal(secrets.storeMap.has('dbstudio.conn.conn_ssh_secret.sshSecret'), false);
 });

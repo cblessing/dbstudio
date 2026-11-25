@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { DatabaseDriverInfo, DatabaseConnection, DatabaseType } from '../../types/database';
+import {
+  DatabaseDriverInfo,
+  DatabaseConnection,
+  DatabaseType,
+  SshTunnelConfig,
+} from '../../types/database';
 import { DATABASE_DRIVERS } from '../../engine/sqlEngineCore';
 import { groupTablesIntoSchemas } from '../../utils/connectionProfiles';
 import {
@@ -11,6 +16,7 @@ import {
   LiveConnectionPayload,
 } from '../../utils/liveBridge';
 import { ParsedConnectionUri } from '../../utils/connectionUri';
+import { toSshFormFields } from '../../utils/connectionLabels';
 import { X, Zap, RefreshCw } from 'lucide-react';
 import { DriverPickerStep } from './DriverPickerStep';
 import {
@@ -70,6 +76,18 @@ function findDriverById(typeId: DatabaseConnection['type']): DatabaseDriverInfo 
   return DATABASE_DRIVERS.find((d) => d.id === typeId) ?? DATABASE_DRIVERS[0];
 }
 
+function buildSshConfigFromForm(form: ConnectionFormState): SshTunnelConfig | undefined {
+  if (!form.sshEnabled) return undefined;
+  return {
+    enabled: true,
+    host: form.sshHost.trim(),
+    port: Number(form.sshPort) || 22,
+    username: form.sshUsername.trim(),
+    authMethod: form.sshAuthMethod,
+    privateKeyPath: form.sshPrivateKeyPath.trim() || undefined,
+  };
+}
+
 function createFormState(editing: DatabaseConnection | null): ConnectionFormState {
   if (!editing) {
     return {
@@ -83,6 +101,7 @@ function createFormState(editing: DatabaseConnection | null): ConnectionFormStat
       password: '',
       ssl: true,
       allowSelfSigned: false,
+      ...toSshFormFields(),
       colorBadge: DATABASE_DRIVERS[0].color,
     };
   }
@@ -98,6 +117,7 @@ function createFormState(editing: DatabaseConnection | null): ConnectionFormStat
     password: '',
     ssl: editing.ssl,
     allowSelfSigned: editing.rejectUnauthorized === false,
+    ...toSshFormFields(editing.ssh),
     colorBadge: editing.colorBadge || driver.color,
   };
 }
@@ -112,6 +132,7 @@ function buildLivePayload(connId: string, form: ConnectionFormState): LiveConnec
     username: form.username.trim(),
     ssl: form.ssl,
     rejectUnauthorized: !form.allowSelfSigned,
+    ssh: buildSshConfigFromForm(form),
   };
 }
 
@@ -132,6 +153,7 @@ function buildSavedConnectionRecord(
     username: form.username,
     ssl: form.ssl,
     rejectUnauthorized: !form.allowSelfSigned,
+    ssh: buildSshConfigFromForm(form),
     colorBadge: form.colorBadge || form.selectedDriver.color,
     status: 'connected',
     pingMs: testStatus?.latencyMs ?? editing?.pingMs ?? 1.2,
@@ -143,9 +165,10 @@ function buildSavedConnectionRecord(
 async function persistLiveConnectionAndSchema(
   connId: string,
   payload: LiveConnectionPayload,
-  password: string
+  password: string,
+  sshSecret: string
 ): Promise<DatabaseConnection['schemas']> {
-  await saveLiveConnection(payload, password);
+  await saveLiveConnection(payload, password, sshSecret);
   const liveTables = await introspectLiveSchema(connId).catch(() => []);
   const fallbackName = defaultSchemaNameFor(payload.type, payload.database);
   return groupTablesIntoSchemas(liveTables, fallbackName);
@@ -333,7 +356,11 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
     }
     const testConnId = editingConnection ? editingConnection.id : `test_${form.selectedDriver.id}`;
     try {
-      const res = await testLiveConnection(buildLivePayload(testConnId, form), form.password);
+      const res = await testLiveConnection(
+        buildLivePayload(testConnId, form),
+        form.password,
+        form.sshSecret
+      );
       setTestStatus({
         testing: false,
         success: res.success,
@@ -358,7 +385,12 @@ export const NewConnectionModal: React.FC<NewConnectionModalProps> = ({
 
     if (isNetworkDriver) {
       try {
-        schemas = await persistLiveConnectionAndSchema(connId, buildLivePayload(connId, form), form.password);
+        schemas = await persistLiveConnectionAndSchema(
+          connId,
+          buildLivePayload(connId, form),
+          form.password,
+          form.sshSecret
+        );
       } catch (err) {
         setTestStatus({ testing: false, success: false, message: err instanceof Error ? err.message : String(err) });
         setIsSaving(false);

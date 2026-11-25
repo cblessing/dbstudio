@@ -2,6 +2,7 @@ import {
   DatabaseConnection,
   DatabaseType,
   SchemaDefinition,
+  SshTunnelConfig,
   TableDefinition,
 } from '../types/database';
 import { DATABASE_DRIVERS } from '../engine/sqlEngineCore';
@@ -35,6 +36,7 @@ export interface ExportedConnectionProfile {
   username: string;
   ssl: boolean;
   rejectUnauthorized: boolean;
+  ssh?: SshTunnelConfig;
   colorBadge: string;
 }
 
@@ -48,6 +50,7 @@ export function exportConnectionProfiles(connections: DatabaseConnection[]): str
     username: c.username,
     ssl: c.ssl,
     rejectUnauthorized: c.rejectUnauthorized !== false,
+    ...(c.ssh?.enabled ? { ssh: c.ssh } : {}),
     colorBadge: c.colorBadge,
   }));
   return JSON.stringify({ version: 1, connections: profiles }, null, 2);
@@ -64,6 +67,22 @@ function resolveImportedPort(rawPort: unknown, defaultPort: number): number {
 
 function defaultSchemaName(type: DatabaseType): string {
   return type === 'postgres' ? 'public' : 'main';
+}
+
+function parseImportedSsh(raw: unknown): SshTunnelConfig | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const s = raw as Record<string, unknown>;
+  if (s.enabled !== true) return undefined;
+  const method =
+    s.authMethod === 'password' || s.authMethod === 'agent' ? s.authMethod : 'privateKey';
+  return {
+    enabled: true,
+    host: asString(s.host),
+    port: resolveImportedPort(s.port, 22),
+    username: asString(s.username),
+    authMethod: method,
+    privateKeyPath: asString(s.privateKeyPath) || undefined,
+  };
 }
 
 function toImportedConnection(raw: unknown, index: number): DatabaseConnection | null {
@@ -86,6 +105,7 @@ function toImportedConnection(raw: unknown, index: number): DatabaseConnection |
     username: asString(obj.username, ''),
     ssl: obj.ssl === true,
     rejectUnauthorized: obj.rejectUnauthorized !== false,
+    ssh: parseImportedSsh(obj.ssh),
     colorBadge: asString(obj.colorBadge, driverColor),
     status: 'disconnected',
     version: driverName,
@@ -174,6 +194,7 @@ export async function registerImportedLiveConnections(
         username: conn.username,
         ssl: conn.ssl,
         rejectUnauthorized: conn.rejectUnauthorized !== false,
+        ssh: conn.ssh,
       },
       ''
     ).catch(() => {});

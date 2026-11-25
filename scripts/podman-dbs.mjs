@@ -141,6 +141,30 @@ function buildServices(pwd, certsDir) {
         pwd,
       ],
     },
+    {
+      name: 'bastion',
+      optional: true,
+      container: 'dbstudio-bastion',
+      image: 'docker.io/library/alpine:3.21',
+      ports: ['127.0.0.1:2222:22'],
+      volumes: [`${certsDir}:/certs-ro:ro`],
+      env: [`BASTION_PASSWORD=${pwd}`],
+      entrypoint: [
+        'sh',
+        '-c',
+        [
+          'apk add --no-cache openssh-server >/dev/null',
+          'ssh-keygen -A >/dev/null',
+          'adduser -D -s /bin/sh bastion 2>/dev/null || true',
+          'echo "bastion:${BASTION_PASSWORD}" | chpasswd',
+          'mkdir -p /home/bastion/.ssh && cp /certs-ro/bastion_id_ed25519.pub /home/bastion/.ssh/authorized_keys',
+          'chown -R bastion:bastion /home/bastion/.ssh && chmod 700 /home/bastion/.ssh && chmod 600 /home/bastion/.ssh/authorized_keys',
+          'printf "Port 22\\nPermitRootLogin no\\nPasswordAuthentication yes\\nPubkeyAuthentication yes\\nAllowTcpForwarding yes\\nGatewayPorts no\\n" > /etc/ssh/sshd_config.d/dbstudio.conf',
+          'exec /usr/sbin/sshd -D -e',
+        ].join(' && '),
+      ],
+      cmd: [],
+    },
   ];
 }
 
@@ -148,11 +172,20 @@ function runPodman(args) {
   return execFileSync('podman', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
+function ensureBastionKey(certsDir) {
+  const privKey = path.join(certsDir, 'bastion_id_ed25519');
+  if (fs.existsSync(privKey) && fs.existsSync(`${privKey}.pub`)) return;
+  fs.mkdirSync(certsDir, { recursive: true });
+  execFileSync('ssh-keygen', ['-t', 'ed25519', '-N', '', '-f', privKey, '-C', 'dbstudio-bastion'], {
+    stdio: 'inherit',
+  });
+}
+
 const [, , action = 'up', ...selected] = process.argv;
 const pwd = loadEnvPassword();
 const certsDir = path.resolve(process.cwd(), '.certs');
-const services = buildServices(pwd, certsDir).filter(
-  (s) => selected.length === 0 || selected.includes(s.name)
+const services = buildServices(pwd, certsDir).filter((s) =>
+  selected.length === 0 ? !s.optional : selected.includes(s.name)
 );
 
 if (action === 'down') {
@@ -195,6 +228,9 @@ if (action === 'start') {
 
 if (!fs.existsSync(path.join(certsDir, 'server.crt'))) {
   execFileSync('node', ['scripts/generate-dev-certs.mjs'], { stdio: 'inherit' });
+}
+if (services.some((s) => s.name === 'bastion')) {
+  ensureBastionKey(certsDir);
 }
 
 for (const svc of services) {

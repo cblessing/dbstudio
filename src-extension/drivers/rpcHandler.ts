@@ -25,8 +25,10 @@ function asOptionalString(val: unknown): string | undefined {
 }
 
 const RPC_HANDLERS: Record<string, RpcHandlerFn> = {
-  testLiveConnection: (svc, msg) => svc.testConnection(msg.config, asOptionalString(msg.password)),
-  saveLiveConnection: (svc, msg) => svc.saveConnection(msg.config, asOptionalString(msg.password)),
+  testLiveConnection: (svc, msg) =>
+    svc.testConnection(msg.config, asOptionalString(msg.password), asOptionalString(msg.sshSecret)),
+  saveLiveConnection: (svc, msg) =>
+    svc.saveConnection(msg.config, asOptionalString(msg.password), asOptionalString(msg.sshSecret)),
   deleteLiveConnection: async (svc, msg) => {
     const connId = asOptionalString(msg.connectionId);
     if (connId) await svc.deleteConnection(connId);

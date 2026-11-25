@@ -75,6 +75,17 @@ export interface SchemaDefinition {
   procedures?: ProcedureDefinition[];
 }
 
+export type SshAuthMethod = 'privateKey' | 'password' | 'agent';
+
+export interface SshTunnelConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  authMethod: SshAuthMethod;
+  privateKeyPath?: string;
+}
+
 export interface DatabaseConnection {
   id: string;
   name: string;
@@ -86,6 +97,7 @@ export interface DatabaseConnection {
   password?: string;
   ssl: boolean;
   rejectUnauthorized?: boolean;
+  ssh?: SshTunnelConfig;
   colorBadge: string;
   status: 'connected' | 'disconnected' | 'connecting';
   schemas: SchemaDefinition[];

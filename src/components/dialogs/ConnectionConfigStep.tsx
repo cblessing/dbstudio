@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { ParsedConnectionUri } from '../../utils/connectionUri';
+import { isNetworkDatabaseType } from '../../utils/liveBridge';
 import {
   ConnectionFormState,
   GeneralCard,
   ServerAuthCard,
   SecurityTlsCard,
 } from './ConnectionFormCards';
+import { SshTunnelCard } from './SshTunnelCard';
 
 export type { ConnectionFormState };
 
@@ -66,10 +68,12 @@ export function ConnectionConfigStep({
     general: true,
     server: true,
     security: true,
+    ssh: form.sshEnabled,
   });
 
   const toggleSection = (key: keyof typeof openSections) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  const isNetwork = isNetworkDatabaseType(form.selectedDriver.id);
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-white/10">
@@ -97,6 +101,15 @@ export function ConnectionConfigStep({
         onToggle={() => toggleSection('security')}
         onChange={onChange}
       />
+
+      {isNetwork && (
+        <SshTunnelCard
+          form={form}
+          isOpen={openSections.ssh}
+          onToggle={() => toggleSection('ssh')}
+          onChange={onChange}
+        />
+      )}
 
       {testStatus && (
         <div className="p-3">

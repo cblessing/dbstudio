@@ -104,3 +104,40 @@ test('getConnectionFieldLabels returns database-specific nomenclature', () => {
   assert.equal(redis.databaseLabel, 'Database Index');
   assert.equal(redis.passwordLabel, 'Password / AUTH');
 });
+
+test('exportConnectionProfiles preserves SSH bastion metadata without secrets', () => {
+  const json = exportConnectionProfiles([
+    {
+      id: 'c_bastion',
+      name: 'Prod PG via Bastion',
+      type: 'postgres',
+      host: '10.0.1.12',
+      port: 5432,
+      database: 'prod',
+      username: 'readonly',
+      ssl: true,
+      rejectUnauthorized: true,
+      ssh: {
+        enabled: true,
+        host: 'bastion.example.com',
+        port: 22,
+        username: 'ubuntu',
+        authMethod: 'agent',
+      },
+      colorBadge: '#336791',
+      status: 'disconnected',
+      schemas: [],
+    },
+  ]);
+
+  const imported = parseImportedConnectionProfiles(json);
+  assert.equal(imported.length, 1);
+  assert.deepEqual(imported[0].ssh, {
+    enabled: true,
+    host: 'bastion.example.com',
+    port: 22,
+    username: 'ubuntu',
+    authMethod: 'agent',
+    privateKeyPath: undefined,
+  });
+});

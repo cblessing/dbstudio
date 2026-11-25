@@ -8,6 +8,17 @@ export type LiveDriverType =
   | 'mongodb'
   | 'redis';
 
+export type LiveSshAuthMethod = 'privateKey' | 'password' | 'agent';
+
+export interface LiveSshConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  authMethod: LiveSshAuthMethod;
+  privateKeyPath?: string;
+}
+
 export interface LiveConnectionConfig {
   id: string;
   type: LiveDriverType;
@@ -18,6 +29,7 @@ export interface LiveConnectionConfig {
   ssl: boolean;
   rejectUnauthorized: boolean;
   timeoutMs?: number;
+  ssh?: LiveSshConfig;
 }
 
 export interface LiveQueryOptions {
@@ -126,6 +138,46 @@ function asTrimmedString(val: unknown): string {
   return typeof val === 'string' ? val.trim() : '';
 }
 
+const VALID_SSH_AUTH_METHODS: ReadonlySet<string> = new Set<LiveSshAuthMethod>([
+  'privateKey',
+  'password',
+  'agent',
+]);
+
+function validateSshConfig(
+  rawSsh: unknown
+): { valid: true; ssh?: LiveSshConfig } | { valid: false; error: string } {
+  if (!rawSsh || typeof rawSsh !== 'object') {
+    return { valid: true };
+  }
+  const s = rawSsh as Record<string, unknown>;
+  if (s.enabled !== true) {
+    return { valid: true };
+  }
+  const hostPortErr = validateHostAndPort(s.host, s.port ?? 22);
+  if (hostPortErr) {
+    return { valid: false, error: `SSH bastion ${hostPortErr.toLowerCase()}` };
+  }
+  const username = asTrimmedString(s.username);
+  if (!username) {
+    return { valid: false, error: 'SSH bastion username is required.' };
+  }
+  const authMethod = VALID_SSH_AUTH_METHODS.has(String(s.authMethod))
+    ? (String(s.authMethod) as LiveSshAuthMethod)
+    : 'privateKey';
+  return {
+    valid: true,
+    ssh: {
+      enabled: true,
+      host: String(s.host).trim(),
+      port: Number(s.port ?? 22),
+      username,
+      authMethod,
+      privateKeyPath: asTrimmedString(s.privateKeyPath) || undefined,
+    },
+  };
+}
+
 export function validateConnectionConfig(
   raw: unknown
 ): { valid: true; config: LiveConnectionConfig } | { valid: false; error: string } {
@@ -143,6 +195,10 @@ export function validateConnectionConfig(
   if (hostPortError) {
     return { valid: false, error: hostPortError };
   }
+  const sshCheck = validateSshConfig(obj.ssh);
+  if ('error' in sshCheck) {
+    return { valid: false, error: sshCheck.error };
+  }
 
   return {
     valid: true,
@@ -156,6 +212,7 @@ export function validateConnectionConfig(
       ssl: obj.ssl === true,
       rejectUnauthorized: obj.rejectUnauthorized !== false,
       timeoutMs: normalizeTimeoutMs(obj.timeoutMs),
+      ssh: sshCheck.ssh,
     },
   };
 }
@@ -169,6 +226,7 @@ const STATIC_DRIVER_LOADERS: Record<string, () => unknown> = {
   '@clickhouse/client': () => require('@clickhouse/client'),
   mongodb: () => require('mongodb'),
   ioredis: () => require('ioredis'),
+  ssh2: () => require('ssh2'),
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
