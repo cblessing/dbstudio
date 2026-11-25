@@ -88,6 +88,63 @@
       "ssl": true,
       "rejectUnauthorized": false,
       "colorBadge": "#D82C20"
+    },
+    {
+      "name": "Local PostgreSQL (Bastion)",
+      "type": "postgres",
+      "host": "host.containers.internal",
+      "port": 5432,
+      "database": "dbstudio",
+      "username": "postgres",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "ssh": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "port": 2222,
+        "username": "bastion",
+        "authMethod": "privateKey",
+        "privateKeyPath": "c:/code/dbstudio/.certs/bastion_id_ed25519"
+      },
+      "colorBadge": "#336791"
+    },
+    {
+      "name": "Local MariaDB (Bastion)",
+      "type": "mariadb",
+      "host": "host.containers.internal",
+      "port": 3307,
+      "database": "dbstudio",
+      "username": "root",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "ssh": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "port": 2222,
+        "username": "bastion",
+        "authMethod": "privateKey",
+        "privateKeyPath": "c:/code/dbstudio/.certs/bastion_id_ed25519"
+      },
+      "colorBadge": "#C0715D"
+    },
+    {
+      "name": "Local Oracle (Bastion)",
+      "type": "oracle",
+      "host": "host.containers.internal",
+      "port": 1521,
+      "database": "FREEPDB1",
+      "username": "dbstudio",
+      "ssl": false,
+      "rejectUnauthorized": true,
+      "ssh": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "port": 2222,
+        "username": "bastion",
+        "authMethod": "privateKey",
+        "privateKeyPath": "c:/code/dbstudio/.certs/bastion_id_ed25519"
+      },
+      "colorBadge": "#F80000"
     }
   ]
 }
