@@ -54,3 +54,24 @@ test('exportToSqlInsert escapes backticks in table and column identifiers', () =
   const sql = exportToSqlInsert('weird`table', ['col`1'], [{ 'col`1': "O'Reilly" }]);
   assert.equal(sql, "INSERT INTO `weird``table` (`col``1`) VALUES ('O''Reilly');");
 });
+
+test('export helpers safely serialize BigInt values and circular objects without throwing', () => {
+  const circular: Record<string, any> = { name: 'loop' };
+  circular.self = circular;
+
+  const rows = [{ id: 9007199254740993n, meta: circular }];
+  const json = exportToJson(rows);
+  const parsed = JSON.parse(json);
+  assert.equal(parsed[0].id, '9007199254740993');
+  assert.equal(parsed[0].meta.self, '[Circular]');
+
+  const csv = exportToCsv(['id', 'meta'], rows);
+  assert.ok(csv.includes('9007199254740993'));
+  assert.ok(csv.includes('[Circular]'));
+
+  const sql = exportToSqlInsert('events', ['id', 'meta'], rows);
+  assert.ok(sql.includes('VALUES (9007199254740993,'));
+
+  const md = exportToMarkdown(['id', 'meta'], rows);
+  assert.ok(md.includes('9007199254740993'));
+});

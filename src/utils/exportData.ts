@@ -1,14 +1,38 @@
 import { QueryResult } from '../types/database';
 
+function replaceBigInt(_key: string, val: unknown): unknown {
+  return typeof val === 'bigint' ? val.toString() : val;
+}
+
+export function safeJsonStringify(value: unknown, space?: number): string {
+  try {
+    return JSON.stringify(value, replaceBigInt, space);
+  } catch {
+    const seen = new WeakSet<object>();
+    return JSON.stringify(
+      value,
+      (_key, val) => {
+        if (typeof val === 'bigint') return val.toString();
+        if (val && typeof val === 'object') {
+          if (seen.has(val)) return '[Circular]';
+          seen.add(val);
+        }
+        return val;
+      },
+      space
+    );
+  }
+}
+
 export function quoteSqlIdentifier(name: string): string {
   return `\`${String(name).replace(/`/g, '``')}\``;
 }
 
 export function formatSqlValue(val: any): string {
   if (val === null || val === undefined) return 'NULL';
-  if (typeof val === 'number') return String(val);
+  if (typeof val === 'number' || typeof val === 'bigint') return String(val);
   if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
-  if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
+  if (typeof val === 'object') return `'${safeJsonStringify(val).replace(/'/g, "''")}'`;
   return `'${String(val).replace(/'/g, "''")}'`;
 }
 
@@ -36,8 +60,9 @@ export function exportToCsv(columns: string[], rows: Record<string, any>[]): str
   if (!columns.length) return '';
   const escapeCell = (val: any): string => {
     if (val === null || val === undefined) return '';
-    const rawStr = typeof val === 'object' ? JSON.stringify(val) : String(val);
-    const str = typeof val === 'number' ? rawStr : neutralizeCsvFormula(rawStr);
+    const rawStr = typeof val === 'object' ? safeJsonStringify(val) : String(val);
+    const str =
+      typeof val === 'number' || typeof val === 'bigint' ? rawStr : neutralizeCsvFormula(rawStr);
     if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
       return `"${str.replace(/"/g, '""')}"`;
     }
@@ -51,7 +76,7 @@ export function exportToCsv(columns: string[], rows: Record<string, any>[]): str
 }
 
 export function exportToJson(rows: Record<string, any>[]): string {
-  return JSON.stringify(rows, null, 2);
+  return safeJsonStringify(rows, 2);
 }
 
 export function exportToSqlInsert(
@@ -76,7 +101,7 @@ export function exportToMarkdown(columns: string[], rows: Record<string, any>[])
 
   const formatCell = (val: any): string => {
     if (val === null || val === undefined) return 'NULL';
-    if (typeof val === 'object') return JSON.stringify(val);
+    if (typeof val === 'object') return safeJsonStringify(val).replace(/\|/g, '\\|');
     return String(val).replace(/\|/g, '\\|');
   };
 

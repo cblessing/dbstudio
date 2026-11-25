@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { LiveConnectionService, SecretStoreLike } from './drivers/connectionService';
 import { tryHandleLiveRpcMessage } from './drivers/rpcHandler';
 import { isLiveDriverType } from './drivers/types';
+import { handleSaveFileMessage } from './fileExport';
 
 export { LiveConnectionService };
 
@@ -304,12 +305,6 @@ function stripConnectionSecrets(connections: any[]): any[] {
   });
 }
 
-function sanitizeFilename(rawName: unknown): string {
-  const base = typeof rawName === 'string' ? path.basename(rawName.trim()) : '';
-  if (!base || base === '.' || base === '..') return 'export.txt';
-  return base;
-}
-
 function parseEditorConfig(message: Record<string, any>): EditorTabConfig {
   const allowedTypes: EditorTabConfig['editorType'][] = ['query', 'erd', 'table'];
   const editorType = allowedTypes.includes(message.editorType) ? message.editorType : 'query';
@@ -320,35 +315,6 @@ function parseEditorConfig(message: Record<string, any>): EditorTabConfig {
     title: typeof message.title === 'string' ? message.title : undefined,
     initialQuery: typeof message.initialQuery === 'string' ? message.initialQuery : undefined,
   };
-}
-
-function writeExportPayload(savePath: string, message: any): void {
-  const buffer = message.isBase64
-    ? Buffer.from(String(message.content ?? ''), 'base64')
-    : Buffer.from(String(message.content ?? ''), 'utf8');
-  fs.writeFileSync(savePath, buffer);
-}
-
-async function handleSaveFileMessage(message: any): Promise<void> {
-  const defaultFilename = sanitizeFilename(message.filename);
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
-  const defaultUri = workspaceFolder
-    ? vscode.Uri.joinPath(workspaceFolder, defaultFilename)
-    : vscode.Uri.file(defaultFilename);
-
-  const saveUri = await vscode.window.showSaveDialog({
-    defaultUri,
-    saveLabel: 'Export File',
-  });
-  if (!saveUri) return;
-
-  try {
-    writeExportPayload(saveUri.fsPath, message);
-    vscode.window.showInformationMessage(`Saved export to ${saveUri.fsPath}`);
-  } catch (err: any) {
-    const errText = err instanceof Error ? err.message : String(err);
-    vscode.window.showErrorMessage(`Failed to save file: ${errText}`);
-  }
 }
 
 function handleStateUpdateMessage(

@@ -389,6 +389,106 @@ test('extension persists sanitized connections in globalState and restores them 
   }
 });
 
+test('extension saveFile uses workspace.fs.writeFile and homedir fallback when no workspace is open', async () => {
+  const { createRequire } = await import('node:module');
+  const path = await import('node:path');
+  const os = await import('node:os');
+  const require = createRequire(import.meta.url);
+  const CjsModule = require('node:module');
+
+  let registeredCommandCb: (() => void) | null = null;
+  let messageHandler: ((msg: unknown) => Promise<void>) | null = null;
+  let capturedDialogOpts: Record<string, any> | null = null;
+  let writtenUri: { fsPath: string } | null = null;
+  let writtenBytes: Uint8Array | null = null;
+
+  const vscodeMock = {
+    ViewColumn: { One: 1 },
+    Uri: {
+      joinPath: (base: { fsPath: string }, ...segments: string[]) => ({
+        fsPath: path.join(base.fsPath, ...segments),
+        toString: () => `file://${path.posix.join(base.fsPath.replace(/\\/g, '/'), ...segments)}`,
+      }),
+      file: (p: string) => ({ fsPath: p, toString: () => `file://${p}` }),
+    },
+    commands: {
+      registerCommand: (cmd: string, cb: () => void) => {
+        if (cmd === 'database-studio.open') registeredCommandCb = cb;
+        return { dispose: () => {} };
+      },
+      executeCommand: () => {},
+    },
+    window: {
+      activeTextEditor: undefined,
+      registerWebviewViewProvider: () => ({ dispose: () => {} }),
+      createWebviewPanel: () => ({
+        webview: {
+          html: '',
+          cspSource: 'https://file+.vscode-resource.vscode-cdn.net',
+          asWebviewUri: (uri: { fsPath: string }) => uri.fsPath,
+          onDidReceiveMessage: (cb: (msg: unknown) => Promise<void>) => {
+            messageHandler = cb;
+            return { dispose: () => {} };
+          },
+          postMessage: () => {},
+        },
+        onDidDispose: () => ({ dispose: () => {} }),
+        reveal: () => {},
+        dispose: () => {},
+      }),
+      showSaveDialog: async (opts: Record<string, any>) => {
+        capturedDialogOpts = opts;
+        return { fsPath: '/wsl/remote/export.csv', toString: () => 'vscode-remote://wsl+ubuntu/export.csv' };
+      },
+      showInformationMessage: () => {},
+      showErrorMessage: () => {},
+    },
+    workspace: {
+      workspaceFolders: undefined,
+      fs: {
+        writeFile: async (uri: { fsPath: string }, bytes: Uint8Array) => {
+          writtenUri = uri;
+          writtenBytes = bytes;
+        },
+      },
+    },
+  };
+
+  const origLoad = CjsModule._load;
+  CjsModule._load = function (request: string, parent: any, isMain: boolean) {
+    if (request === 'vscode') return vscodeMock;
+    return origLoad.call(this, request, parent, isMain);
+  };
+
+  try {
+    const extPath = path.resolve(process.cwd(), 'out/extension.js');
+    delete require.cache[extPath];
+    const ext = require(extPath);
+    ext.activate({
+      extensionUri: { fsPath: process.cwd() },
+      subscriptions: [],
+    });
+
+    (registeredCommandCb as () => void)();
+    await (messageHandler as (msg: unknown) => Promise<void>)({
+      command: 'saveFile',
+      filename: 'result_set_export.csv',
+      content: 'id,name\n1,Alice',
+      isBase64: false,
+    });
+
+    assert.ok(capturedDialogOpts, 'showSaveDialog should be invoked');
+    assert.equal(
+      (capturedDialogOpts as Record<string, any>).defaultUri.fsPath,
+      path.join(os.homedir(), 'result_set_export.csv')
+    );
+    assert.equal((writtenUri as { fsPath: string } | null)?.fsPath, '/wsl/remote/export.csv');
+    assert.equal(Buffer.from(writtenBytes!).toString('utf8'), 'id,name\n1,Alice');
+  } finally {
+    CjsModule._load = origLoad;
+  }
+});
+
 test('importDatabaseBinary rejects invalid non-SQLite byte buffers', async () => {
   const invalidBytes = new TextEncoder().encode('not a sqlite database file');
   const imported = await databaseManager.importDatabaseBinary(invalidBytes);

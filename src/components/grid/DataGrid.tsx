@@ -316,14 +316,25 @@ export const DataGrid: React.FC<DataGridProps> = ({
   };
 
   const handleExport = (format: ExportFormat) => {
-    const { content, mimeType, ext } = serializeExportData(
-      format,
-      tableName,
-      columns,
-      filteredAndSortedRows
-    );
-    downloadFile(`${tableName}_export.${ext}`, content, mimeType);
     setExportDropdownOpen(false);
+    setCopyNotification(`Preparing ${format.toUpperCase()} export...`);
+    setTimeout(() => {
+      try {
+        const { content, mimeType, ext } = serializeExportData(
+          format,
+          tableName,
+          columns,
+          filteredAndSortedRows
+        );
+        downloadFile(`${tableName}_export.${ext}`, content, mimeType);
+        setCopyNotification(`Export ready (${filteredAndSortedRows.length} rows)`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setCopyNotification(`Export failed: ${msg}`);
+      } finally {
+        setTimeout(() => setCopyNotification(null), 2500);
+      }
+    }, 0);
   };
 
   const copyAsTsv = () => {
