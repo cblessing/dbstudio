@@ -36,7 +36,9 @@ function loadPrivateKeyBuffer(keyPath: string | undefined): Buffer {
 export function buildSshConnectConfig(
   ssh: LiveSshConfig,
   sshSecret: string,
-  timeoutMs = 10000
+  timeoutMs = 10000,
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform
 ): Record<string, unknown> {
   const base: Record<string, unknown> = {
     host: ssh.host,
@@ -46,7 +48,7 @@ export function buildSshConnectConfig(
   };
 
   if (ssh.authMethod === 'agent') {
-    return { ...base, agent: resolveSshAgentSocket() };
+    return { ...base, agent: resolveSshAgentSocket(env, platform) };
   }
   if (ssh.authMethod === 'password') {
     return { ...base, password: sshSecret };

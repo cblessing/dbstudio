@@ -151,13 +151,17 @@ test('validateConnectionConfig validates SSH bastion settings and LiveConnection
 
   assert.equal(resolveSshAgentSocket({}, 'win32'), '\\\\.\\pipe\\openssh-ssh-agent');
   assert.equal(resolveSshAgentSocket({ SSH_AUTH_SOCK: '/tmp/agent.sock' }, 'linux'), '/tmp/agent.sock');
+  assert.throws(() => resolveSshAgentSocket({}, 'linux'), /SSH_AUTH_SOCK/);
   assert.ok(expandHomePath('~/.ssh/id_ed25519').endsWith('id_ed25519'));
 
   const agentCfg = buildSshConnectConfig(
     { enabled: true, host: '127.0.0.1', port: 2222, username: 'bastion', authMethod: 'agent' },
-    ''
+    '',
+    10000,
+    { SSH_AUTH_SOCK: '/tmp/test-agent.sock' },
+    'linux'
   );
-  assert.ok(typeof agentCfg.agent === 'string');
+  assert.equal(agentCfg.agent, '/tmp/test-agent.sock');
 
   const secrets = createMockSecretStore();
   const service = new LiveConnectionService(secrets);
