@@ -2,7 +2,7 @@
 
 All notable changes to **Database Studio** will be documented in this file.
 
-## [1.0.2] - Bug Fix Release
+## [1.1.0] - Pre-Release
 
 ### Fixed
 - **WSL & Remote Data Export**: Switched file export writes from synchronous `fs.writeFileSync` to VS Code's async `vscode.workspace.fs.writeFile`, added a safe `os.homedir()` fallback when no workspace folder is open, and wrapped save dialog handling in `try/catch` so exports work reliably in WSL, Remote-SSH, and Dev Containers.

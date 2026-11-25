@@ -19,7 +19,7 @@ Follow these engineering practices on every change in this repository.
   1. `npm run lint` (TypeScript type check)
   2. `npm run build` (frontend bundle + VS Code extension host compilation)
   3. `npm test` (full unit test suite)
-  4. Rebuild `database-studio-vscode-1.0.0.vsix` whenever extension or UI code changes so the installable package stays up to date.
+  4. Rebuild `database-studio-vscode-<version>.vsix` whenever extension or UI code changes so the installable package stays up to date.
 
 ## 4. Security & Performance by Design
 - **No Secrets in Source:** Never hardcode credentials, tokens, or private keys in source files.
@@ -27,4 +27,10 @@ Follow these engineering practices on every change in this repository.
 - **Responsive UI & Data Batching:** Avoid blocking the main thread; paginate/batch unbounded queries (default batch size: 1,000 rows) and load additional rows on demand.
 
 ## 5. Living Documentation
-- Keep `README.md`, public interfaces, and exported types accurate and in sync with the implementation.
+- Keep `README.md`, `CHANGELOG.md`, public interfaces, and exported types accurate and in sync with the implementation.
+
+## 6. Branching & Marketplace Release Strategy
+- **`main` (Stable Release Channel):** Always matches the latest production Marketplace release. Uses **even minor** versions (`1.0.x`, `1.2.x`, `1.4.x`, ...). Package with `npx @vscode/vsce package --no-dependencies`.
+- **`pre-release` (Pre-Release Channel):** Long-running beta branch matching the Marketplace Pre-Release channel. Uses **odd minor** versions (`1.1.x`, `1.3.x`, `1.5.x`, ...) strictly newer than the latest stable release. Package with `npx @vscode/vsce package --pre-release --no-dependencies`.
+- **Feature & Bugfix Flow:** Merge `fix/*` or `feat/*` branches into `pre-release` first for beta validation. Once verified, merge `pre-release` into `main`, bump to the next even minor version (e.g., `1.1.x` -> `1.2.0`) so both stable and pre-release users automatically update to the new stable release, and publish.
+- **Urgent Stable Hotfixes:** For critical production fixes that cannot wait for `pre-release`, commit/patch directly on `main` (incrementing the patch version, e.g., `1.0.1` -> `1.0.2`), then merge `main` back into `pre-release`.
