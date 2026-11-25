@@ -23,4 +23,6 @@ bun.lock
 AGENTS.md
 eslint.config.js
 compose.yaml
+podman-connections.json
+public/*.wasm
 out/**/*.map

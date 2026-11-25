@@ -1,13 +1,18 @@
 {
   "name": "database-studio-vscode",
   "displayName": "Database Studio",
-  "description": "Universal database client for VS Code with support for Oracle, SQL Server, PostgreSQL, MySQL, DuckDB, and SQLite, visual query runner, ER diagrams, and editable data grid.",
+  "description": "Universal database client for VS Code supporting PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, ClickHouse, MongoDB, Redis, DuckDB, and SQLite with SSH bastion tunneling, visual ER diagrams, live EXPLAIN plans, and paginated data grid.",
   "version": "1.0.0",
-  "publisher": "database-studio",
+  "publisher": "cblessing",
+  "license": "Apache-2.0",
   "icon": "public/icon.png",
+  "homepage": "https://github.com/cblessing/dbstudio#readme",
+  "bugs": {
+    "url": "https://github.com/cblessing/dbstudio/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/database-studio/database-studio"
+    "url": "https://github.com/cblessing/dbstudio"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -20,12 +25,19 @@
   "keywords": [
     "database",
     "sql",
+    "postgresql",
+    "mysql",
+    "mariadb",
     "oracle",
     "sql server",
-    "postgres",
-    "mysql",
+    "clickhouse",
+    "mongodb",
+    "redis",
     "sqlite",
-    "duckdb"
+    "duckdb",
+    "ssh tunnel",
+    "bastion",
+    "erd"
   ],
   "main": "./out/extension.js",
   "activationEvents": [
@@ -100,7 +112,7 @@
     "lint": "npm run typecheck && npm run lint:eslint",
     "test": "tsx --test src/utils/connectionProfiles.test.ts src/utils/connectionUri.test.ts src/utils/erDiagramLayout.test.ts src/utils/exportData.test.ts src/utils/navigatorObjects.test.ts src/utils/sqlCompletion.test.ts src/utils/sqlFormatter.test.ts src/utils/tableManagement.test.ts src/engine/sqlEngineCore.test.ts src/engine/databaseManager.test.ts src-extension/drivers/connectionService.test.ts src-extension/drivers/explainParser.test.ts src-extension/drivers/queryPagination.test.ts",
     "package:extension": "npm run build && npx @vscode/vsce package --no-dependencies --allow-missing-repository",
-    "publish:extension": "npm run build && npx @vscode/vsce publish"
+    "publish:extension": "npm run build && npx @vscode/vsce publish --no-dependencies"
   },
   "dependencies": {
     "lucide-react": "^0.546.0",

@@ -1,103 +1,46 @@
-# Database Studio (VS Code Extension)
+# Database Studio
 
-> Universal database client for Visual Studio Code with multi-dialect SQL support, visual table designer, interactive ER diagrams, and query runner.
+> Universal database client for Visual Studio Code supporting PostgreSQL, MySQL, MariaDB, Microsoft SQL Server, Oracle, ClickHouse, MongoDB, Redis, DuckDB, and SQLite — with SSH bastion tunneling, live execution plans, paginated data grid, visual table designer, and interactive ER diagrams.
 
 ## Features
 
-- **⚡ Embedded Local SQL Engine**: Runs an embedded local SQLite engine out of the box with zero external dependencies required.
-- **🌐 Universal Database Dialect Support**:
-  - **Oracle Database** (`VARCHAR2`, `IDENTITY`, `ROWNUM`, `SYSDATE`, `DUAL`, `CASCADE CONSTRAINTS`)
-  - **Microsoft SQL Server (T-SQL)** (`NVARCHAR`, `IDENTITY(1,1)`, `TOP N`, `@@VERSION`, `@@SERVERNAME`, brackets `[table]`)
-  - **PostgreSQL** (`SERIAL`, `BOOLEAN`, `TIMESTAMPTZ`, `RETURNING`)
-  - **MySQL / MariaDB** (`AUTO_INCREMENT`, backticks `` `table` ``)
-  - **DuckDB & SQLite**
-- **🖱️ Right-Click Object Management**:
-  - Right-click any table or column in the Database Navigator.
-  - Drop table with foreign-key cascade options.
-  - Truncate / clear table data.
-  - Rename tables and add/drop/rename columns with instant SQL preview.
-  - Visual Table Designer with interactive column types and constraints.
-- **📊 Interactive Data Grid**:
-  - Inline editing with pending-change indicators.
-  - Export to CSV, JSON, SQL INSERT statements, and Markdown tables.
-  - Pagination, column sorting, and instant search filter.
-- **🗺️ Visual ER Diagram**:
-  - Interactive table relationship graphs with smooth bezier connector paths.
-  - Foreign key relationship inspection.
-- **⚡ Visual Query Execution Plan**:
-  - Step-by-step query cost and join pipeline visualizer.
+### Supported Database Engines
+- **Relational SQL**: PostgreSQL, MySQL, MariaDB, Microsoft SQL Server (T-SQL), Oracle Database (Thin Mode — no Instant Client required), and SQLite (embedded local engine)
+- **Analytical / OLAP**: ClickHouse and DuckDB
+- **NoSQL**: MongoDB and Redis
 
----
+### Secure Connectivity & SSH Bastion Tunneling
+- **VS Code SecretStorage**: Database passwords and SSH credentials are stored securely in VS Code's OS-backed `SecretStorage` — never saved in plaintext JSON or workspace files.
+- **Connection URI Support**: Paste a full connection URI to auto-populate fields, or copy a connection URI on demand.
+- **SSL / TLS**: Built-in TLS encryption toggle with optional self-signed certificate support for local dev containers.
+- **SSH Tunnel (Bastion Host)**: Forward traffic for any network database through an SSH jump host using **Private Key** (with optional passphrase), **SSH Agent** (`SSH_AUTH_SOCK` / Windows OpenSSH Agent), or **Password** authentication.
+- **Profile Import / Export**: Export and import connection lists as JSON (passwords and SSH secrets are always excluded).
 
-## Quickstart & Local Testing in VS Code
+### Database Navigator
+- **Multi-Schema Grouping**: Automatically discovers and groups accessible user schemas (e.g., PostgreSQL, SQL Server, Oracle), with an optional right-click toggle to show or hide Oracle-maintained internal tables.
+- **Engine-Accurate Object Trees**: Displays native object folders per engine (`Tables`, `Views`, `Procedures` / `Stored Procedures`, `Functions`, `Packages`, `Collections`, `Keyspace`).
+- **Context Menus & Hover Actions**: View Data, Edit Columns / Structure, Generate `SELECT` / `INSERT` / `CREATE VIEW` / `CREATE PROCEDURE` / `CREATE FUNCTION` / `CREATE PACKAGE` scripts, Refresh Schema, Truncate, and Drop (with confirmation and SQL preview).
 
-### 1. Test via Extension Development Host (F5)
+### SQL Console & Visual Execution Plans
+- **Multi-Dialect SQL Editor**: Context-aware autocomplete for tables, views, procedures, and columns, SQL formatting, and selection-based execution (`Ctrl+Enter` / `F5`).
+- **Live `EXPLAIN` Plans**: Click **Explain** to execute your query and inspect the visual execution plan tree (real `EXPLAIN` plans for PostgreSQL, MySQL/MariaDB, Oracle, and ClickHouse).
 
-1. Clone or download this repository.
-2. Open in VS Code:
-   ```bash
-   code .
-   ```
-3. Install dependencies and build the frontend bundle:
-   ```bash
-   npm install
-   npm run build
-   ```
-4. Press **`F5`** (or go to **Run & Debug** `Ctrl+Shift+D` and select **"Run Database Studio Extension"**).
-5. In the new window, open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and run:
-   ```
-   Database Studio: Open Database Studio
-   ```
+### Paginated Data Grid & Visual Tools
+- **Smart 1,000-Row Batching**: Automatically paginates large tables and unbounded queries in 1,000-row batches with configurable page sizes (`10`, `25`, `50`, `100`, `500`, `1000`) and seamless paging beyond 1,000 rows.
+- **Data Export**: Export results to CSV, JSON, SQL `INSERT` statements, or Markdown tables, or copy directly as TSV.
+- **Visual Table Designer & ER Diagrams**: Create/alter tables visually and explore schema foreign-key relationships in an interactive ER diagram.
+- **Full VS Code Theme Support**: Automatically adapts to Dark, Light, High Contrast, High Contrast Light, and third-party VS Code color themes.
 
----
+## Getting Started
 
-## Packaging as `.vsix`
+1. Click the **Database Studio** icon in the VS Code Activity Bar.
+2. Click **+ New Connection**, choose your database engine, and enter your connection details (or paste a Connection URI).
+3. Click **Test** to verify connectivity, then **Connect** to introspect your schemas and start querying.
 
-To install the extension directly into your primary VS Code instance:
+## Feedback & Issues
 
-```bash
-# Package into .vsix
-npm run package:extension
-
-# Install in VS Code
-code --install-extension database-studio-vscode-1.0.0.vsix
-```
-
----
-
-## Git Setup
-
-```bash
-# Initialize git repository
-git init
-
-# Stage all files
-git add .
-
-# Initial commit
-git commit -m "feat: initial commit for Database Studio VS Code extension"
-
-# Connect to your GitHub / GitLab repository
-git branch -M main
-git remote add origin https://github.com/<your-username>/<your-repo-name>.git
-git push -u origin main
-```
-
----
-
-## Publishing to the VS Code Marketplace
-
-1. Create a Personal Access Token on [Azure DevOps](https://dev.azure.com) with **Marketplace (Acquire, Manage)** scope.
-2. Create a Publisher ID on [Marketplace Management](https://marketplace.visualstudio.com/manage).
-3. Set your publisher ID in `package.extension.json`.
-4. Run:
-   ```bash
-   npx @vscode/vsce login <your-publisher-id>
-   npm run publish:extension
-   ```
-
----
+Report bugs or request features at [github.com/cblessing/dbstudio/issues](https://github.com/cblessing/dbstudio/issues).
 
 ## License
 
-Apache-2.0
+Apache-2.0 — see [LICENSE](LICENSE).
