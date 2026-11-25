@@ -73,6 +73,8 @@ export interface SchemaDefinition {
   tables: TableDefinition[];
   views?: ViewDefinition[];
   procedures?: ProcedureDefinition[];
+  functions?: ProcedureDefinition[];
+  packages?: ProcedureDefinition[];
 }
 
 export type SshAuthMethod = 'privateKey' | 'password' | 'agent';

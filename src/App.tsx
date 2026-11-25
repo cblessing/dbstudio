@@ -320,6 +320,7 @@ export default function App() {
   const {
     isRefreshingConns,
     handleDeleteConnection,
+    handleDropObjectClick,
     handleRefreshConnection,
     handleRefreshAllConnections,
     handleExportConnections,
@@ -330,6 +331,8 @@ export default function App() {
     setConnections,
     setActiveConnectionId,
     broadcastConnectionsUpdate,
+    setConfirmModal,
+    onExecuteDdl: handleExecuteQuery,
   });
 
   const commands = buildWorkspaceCommands({
@@ -401,6 +404,7 @@ export default function App() {
       onDropTableClick={handleDropTableClick}
       onTruncateTableClick={handleTruncateTableClick}
       onDropColumnClick={handleDropColumnClick}
+      onDropObjectClick={handleDropObjectClick}
       onExportDatabase={handleDownloadDatabase}
     />
   );

@@ -82,17 +82,21 @@ export function ConnectionTreeHeader({
   conn,
   isExpanded,
   isActive,
+  isRefreshing = false,
   onToggleConnection,
   onContextMenu,
   onOpenSqlEditor,
+  onRefreshConnection,
   onDeleteConnection,
 }: {
   conn: DatabaseConnection;
   isExpanded: boolean;
   isActive: boolean;
+  isRefreshing?: boolean;
   onToggleConnection: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onOpenSqlEditor: () => void;
+  onRefreshConnection?: () => void;
   onDeleteConnection: () => void;
 }) {
   const consoleLabel = getConsoleActionLabel(conn.type);
@@ -140,6 +144,20 @@ export function ConnectionTreeHeader({
         >
           <Code2 className="w-3 h-3" />
         </button>
+        {onRefreshConnection && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRefreshConnection();
+            }}
+            disabled={isRefreshing}
+            title="Refresh Schema"
+            aria-label={`Refresh Schema for ${conn.name}`}
+            className="p-0.5 hover:bg-[#454545] disabled:opacity-50 rounded text-sky-400"
+          >
+            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation();

@@ -11,14 +11,13 @@ import {
   buildConnectionContextMenuItems,
   buildTableContextMenuItems,
   buildViewContextMenuItems,
-  buildProcedureContextMenuItems,
-  buildViewsGroupContextMenuItems,
-  buildProceduresGroupContextMenuItems,
+  buildRoutineContextMenuItems,
+  buildObjectGroupContextMenuItems,
   buildColumnContextMenuItems,
   buildSchemaContextMenuItems,
-  buildTablesGroupContextMenuItems,
   NavigatorMenuCallbacks,
 } from './navigatorContextMenus';
+import { ObjectGroupSpec } from '../../utils/navigatorObjects';
 import { SchemaObjectGroups } from './NavigatorTreeNodes';
 import {
   NavigatorHeader,
@@ -26,6 +25,7 @@ import {
   SchemaTreeRow,
 } from './NavigatorHeaderRows';
 import { parseImportedConnectionProfiles } from '../../utils/connectionProfiles';
+import { isNetworkDatabaseType } from '../../utils/liveBridge';
 import { Database, Search } from 'lucide-react';
 
 interface DatabaseNavigatorProps extends NavigatorMenuCallbacks {
@@ -63,6 +63,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
   onDropTableClick,
   onTruncateTableClick,
   onDropColumnClick,
+  onDropObjectClick,
   onExportDatabase,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -74,6 +75,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
   const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>({});
   const [showOracleMaintained, setShowOracleMaintained] = useState(false);
+  const [refreshingConnId, setRefreshingConnId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -90,6 +92,8 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
     onDropTableClick,
     onTruncateTableClick,
     onDropColumnClick,
+    onDropObjectClick,
+    onRefreshConnection,
   };
 
   const toggleConnection = (id: string) => {
@@ -138,14 +142,36 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
   const handleViewContextMenu = (e: React.MouseEvent, connId: string, vw: ViewDefinition) =>
     openContextMenu(e, buildViewContextMenuItems(connId, vw, menuCallbacks, getConnDialect(connId)));
 
-  const handleProcedureContextMenu = (e: React.MouseEvent, connId: string, proc: ProcedureDefinition) =>
-    openContextMenu(e, buildProcedureContextMenuItems(connId, proc, menuCallbacks, getConnDialect(connId)));
+  const handleRoutineContextMenu = (
+    e: React.MouseEvent,
+    connId: string,
+    kind: 'procedure' | 'function' | 'package',
+    item: ProcedureDefinition
+  ) =>
+    openContextMenu(
+      e,
+      buildRoutineContextMenuItems(kind, connId, item, menuCallbacks, getConnDialect(connId))
+    );
 
-  const handleViewsGroupContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
-    openContextMenu(e, buildViewsGroupContextMenuItems(connId, schemaName, getConnDialect(connId), menuCallbacks));
-
-  const handleProceduresGroupContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
-    openContextMenu(e, buildProceduresGroupContextMenuItems(connId, schemaName, getConnDialect(connId), menuCallbacks));
+  const handleObjectGroupContextMenu = (
+    e: React.MouseEvent,
+    spec: ObjectGroupSpec,
+    connId: string,
+    schemaName: string
+  ) => {
+    const items = buildObjectGroupContextMenuItems(
+      spec,
+      connId,
+      schemaName,
+      getConnDialect(connId),
+      menuCallbacks,
+      {
+        showOracleMaintained,
+        onToggleOracleMaintained: () => setShowOracleMaintained((prev) => !prev),
+      }
+    );
+    if (items.length > 0) openContextMenu(e, items);
+  };
 
   const handleColumnContextMenu = (e: React.MouseEvent, connId: string, tbl: TableDefinition, col: ColumnDefinition) =>
     openContextMenu(e, buildColumnContextMenuItems(connId, tbl, col, menuCallbacks));
@@ -153,14 +179,15 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
   const handleSchemaContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
     openContextMenu(e, buildSchemaContextMenuItems(connId, schemaName, menuCallbacks, getConnDialect(connId)));
 
-  const handleTablesGroupContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
-    openContextMenu(
-      e,
-      buildTablesGroupContextMenuItems(connId, schemaName, menuCallbacks, getConnDialect(connId), {
-        showOracleMaintained,
-        onToggleOracleMaintained: () => setShowOracleMaintained((prev) => !prev),
-      })
-    );
+  const handleRefreshSingle = async (connId: string) => {
+    if (!onRefreshConnection) return;
+    setRefreshingConnId(connId);
+    try {
+      await onRefreshConnection(connId);
+    } finally {
+      setRefreshingConnId((prev) => (prev === connId ? null : prev));
+    }
+  };
 
   const handleConnectionContextMenu = (e: React.MouseEvent, conn: DatabaseConnection) =>
     openContextMenu(
@@ -248,9 +275,15 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
                   conn={conn}
                   isExpanded={isConnExpanded}
                   isActive={isActive}
+                  isRefreshing={refreshingConnId === conn.id}
                   onToggleConnection={() => toggleConnection(conn.id)}
                   onContextMenu={(e) => handleConnectionContextMenu(e, conn)}
                   onOpenSqlEditor={() => onOpenSqlEditor(conn.id)}
+                  onRefreshConnection={
+                    onRefreshConnection && isNetworkDatabaseType(conn.type)
+                      ? () => handleRefreshSingle(conn.id)
+                      : undefined
+                  }
                   onDeleteConnection={() => onDeleteConnection(conn.id)}
                 />
 
@@ -275,10 +308,12 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
                           {isSchemaExpanded && (
                             <SchemaObjectGroups
                               connId={conn.id}
+                              dbType={conn.type}
                               schema={schema}
                               schemaKey={schemaKey}
                               searchTerm={searchTerm}
                               showSystemTables={conn.type === 'oracle' ? showOracleMaintained : true}
+                              isRefreshing={refreshingConnId === conn.id}
                               expandedObjectGroups={expandedObjectGroups}
                               expandedTables={expandedTables}
                               expandedViews={expandedViews}
@@ -288,13 +323,16 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
                               onOpenTable={onOpenTable}
                               onOpenSqlEditor={onOpenSqlEditor}
                               onEditColumns={onEditColumns}
-                              onDropTableClick={onDropTableClick}
-                              onTablesGroupContextMenu={handleTablesGroupContextMenu}
-                              onViewsGroupContextMenu={handleViewsGroupContextMenu}
-                              onProceduresGroupContextMenu={handleProceduresGroupContextMenu}
+                              onCreateTableClick={onCreateTableClick}
+                              onRefreshConnection={
+                                onRefreshConnection && isNetworkDatabaseType(conn.type)
+                                  ? () => handleRefreshSingle(conn.id)
+                                  : undefined
+                              }
+                              onObjectGroupContextMenu={handleObjectGroupContextMenu}
                               onTableContextMenu={handleTableContextMenu}
                               onViewContextMenu={handleViewContextMenu}
-                              onProcedureContextMenu={handleProcedureContextMenu}
+                              onRoutineContextMenu={handleRoutineContextMenu}
                               onColumnContextMenu={handleColumnContextMenu}
                             />
                           )}

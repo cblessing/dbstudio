@@ -8,15 +8,14 @@ import {
   ColumnDefinition,
 } from '../../types/database';
 import { ContextMenuItem } from '../dialogs/ContextMenu';
-import {
-  getConsoleActionLabel,
-  supportsErDiagram,
-} from '../../utils/connectionProfiles';
+import { getConsoleActionLabel, supportsErDiagram } from '../../utils/connectionProfiles';
 import { isNetworkDatabaseType } from '../../utils/liveBridge';
 import {
-  generateCreateViewTemplateSql,
-  generateCreateProcedureTemplateSql,
-} from '../../utils/tableManagement';
+  ObjectGroupSpec,
+  generateCreateObjectTemplateSql,
+  generateRoutineRunSql,
+  getObjectGroupsForEngine,
+} from '../../utils/navigatorObjects';
 import {
   Table,
   Eye,
@@ -43,6 +42,12 @@ export interface NavigatorMenuCallbacks {
   onDropTableClick: (connectionId: string, tableName: string) => void;
   onTruncateTableClick: (connectionId: string, tableName: string) => void;
   onDropColumnClick: (connectionId: string, tableName: string, colName: string) => void;
+  onDropObjectClick?: (
+    connectionId: string,
+    kind: 'view' | 'procedure' | 'function' | 'package',
+    objectName: string
+  ) => void;
+  onRefreshConnection?: (connectionId: string) => void;
 }
 
 export function buildTableContextMenuItems(
@@ -63,12 +68,6 @@ export function buildTableContextMenuItems(
       label: 'Edit Columns / Structure...',
       icon: <Code2 className="w-3.5 h-3.5 text-sky-400" />,
       action: () => cb.onEditColumns(connId, tbl),
-    },
-    {
-      id: 'view_erd',
-      label: 'View ER Diagram',
-      icon: <LayoutGrid className="w-3.5 h-3.5 text-emerald-400" />,
-      action: () => cb.onOpenERDiagram(connId),
     },
     { id: 'div_1', isDivider: true, label: '' },
     {
@@ -95,6 +94,12 @@ export function buildTableContextMenuItems(
       icon: <Code2 className="w-3.5 h-3.5 text-purple-400" />,
       action: () => cb.onOpenSqlEditor(connId, ddlScript),
     },
+    {
+      id: 'copy_table_name',
+      label: `Copy Table Name ("${tbl.name}")`,
+      icon: <Copy className="w-3.5 h-3.5 text-zinc-400" />,
+      action: () => navigator.clipboard.writeText(tbl.name),
+    },
     { id: 'div_2', isDivider: true, label: '' },
     {
       id: 'truncate_table',
@@ -118,7 +123,7 @@ export function buildViewContextMenuItems(
   cb: NavigatorMenuCallbacks,
   dialect: DatabaseType = 'sqlite'
 ): ContextMenuItem[] {
-  return [
+  const items: ContextMenuItem[] = [
     {
       id: 'query_view',
       label: `SELECT * FROM ${vw.name}`,
@@ -127,7 +132,7 @@ export function buildViewContextMenuItems(
     },
     {
       id: 'view_ddl',
-      label: 'Show View Definition (DDL)',
+      label: 'Edit View Definition (DDL)',
       icon: <Code2 className="w-3.5 h-3.5 text-purple-400" />,
       action: () => cb.onOpenSqlEditor(connId, vw.definition),
     },
@@ -142,76 +147,150 @@ export function buildViewContextMenuItems(
       id: 'create_new_view',
       label: 'Create New View',
       icon: <Plus className="w-3.5 h-3.5 text-emerald-400" />,
-      action: () => cb.onOpenSqlEditor(connId, generateCreateViewTemplateSql(vw.schema ?? 'public', dialect)),
+      action: () =>
+        cb.onOpenSqlEditor(
+          connId,
+          generateCreateObjectTemplateSql('views', vw.schema ?? 'public', dialect)
+        ),
     },
   ];
+
+  if (cb.onDropObjectClick) {
+    items.push({
+      id: 'drop_view',
+      label: 'Drop View (DROP VIEW)',
+      icon: <Trash2 className="w-3.5 h-3.5 text-rose-400" />,
+      isDestructive: true,
+      action: () => cb.onDropObjectClick?.(connId, 'view', vw.name),
+    });
+  }
+  return items;
 }
 
-export function buildProcedureContextMenuItems(
+const ROUTINE_LABELS: Record<'procedure' | 'function' | 'package', { noun: string; group: 'procedures' | 'functions' | 'packages'; runPrefix: string }> = {
+  procedure: { noun: 'Procedure', group: 'procedures', runPrefix: 'Execute Procedure' },
+  function: { noun: 'Function', group: 'functions', runPrefix: 'Call Function' },
+  package: { noun: 'Package', group: 'packages', runPrefix: 'Execute Package Block' },
+};
+
+export function buildRoutineContextMenuItems(
+  kind: 'procedure' | 'function' | 'package',
   connId: string,
-  proc: ProcedureDefinition,
+  item: ProcedureDefinition,
   cb: NavigatorMenuCallbacks,
   dialect: DatabaseType = 'sqlite'
 ): ContextMenuItem[] {
-  return [
+  const meta = ROUTINE_LABELS[kind];
+  const items: ContextMenuItem[] = [
     {
-      id: 'exec_proc',
-      label: `Execute Procedure (EXEC ${proc.name})`,
+      id: `exec_${kind}`,
+      label: `${meta.runPrefix} (${item.name})`,
       icon: <Cpu className="w-3.5 h-3.5 text-amber-400" />,
-      action: () => cb.onOpenSqlEditor(connId, `EXEC ${proc.name};`),
+      action: () => cb.onOpenSqlEditor(connId, generateRoutineRunSql(kind, item.name, dialect)),
     },
     {
-      id: 'proc_ddl',
-      label: 'Show Procedure Definition (DDL)',
+      id: `edit_${kind}`,
+      label: `Edit ${meta.noun} Definition (DDL)`,
       icon: <Code2 className="w-3.5 h-3.5 text-purple-400" />,
-      action: () => cb.onOpenSqlEditor(connId, proc.definition),
+      action: () => cb.onOpenSqlEditor(connId, item.definition),
     },
     {
-      id: 'copy_proc_name',
-      label: `Copy Procedure Name ("${proc.name}")`,
+      id: `copy_${kind}`,
+      label: `Copy ${meta.noun} Name ("${item.name}")`,
       icon: <Copy className="w-3.5 h-3.5 text-zinc-400" />,
-      action: () => navigator.clipboard.writeText(proc.name),
+      action: () => navigator.clipboard.writeText(item.name),
     },
-    { id: 'div_new_proc', isDivider: true, label: '' },
+    { id: `div_new_${kind}`, isDivider: true, label: '' },
     {
-      id: 'create_new_procedure',
-      label: 'Create New Procedure',
+      id: `create_new_${kind}`,
+      label: `Create New ${meta.noun}`,
       icon: <Plus className="w-3.5 h-3.5 text-amber-400" />,
-      action: () => cb.onOpenSqlEditor(connId, generateCreateProcedureTemplateSql(proc.schema ?? 'public', dialect)),
+      action: () =>
+        cb.onOpenSqlEditor(
+          connId,
+          generateCreateObjectTemplateSql(meta.group, item.schema ?? 'public', dialect)
+        ),
+    },
+  ];
+
+  if (cb.onDropObjectClick) {
+    items.push({
+      id: `drop_${kind}`,
+      label: `Drop ${meta.noun} (DROP ${kind.toUpperCase()})`,
+      icon: <Trash2 className="w-3.5 h-3.5 text-rose-400" />,
+      isDestructive: true,
+      action: () => cb.onDropObjectClick?.(connId, kind, item.name),
+    });
+  }
+  return items;
+}
+
+function buildOracleMaintainedToggleItems(
+  oracleOptions: { showOracleMaintained: boolean; onToggleOracleMaintained: () => void },
+  hasExistingItems: boolean
+): ContextMenuItem[] {
+  const divider: ContextMenuItem[] = hasExistingItems
+    ? [{ id: 'div_oracle_sys', isDivider: true, label: '' }]
+    : [];
+  return [
+    ...divider,
+    {
+      id: 'toggle_oracle_maintained',
+      label: oracleOptions.showOracleMaintained
+        ? 'Hide Oracle-Maintained Tables'
+        : 'Show Oracle-Maintained Tables',
+      icon: oracleOptions.showOracleMaintained ? (
+        <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
+      ) : (
+        <Eye className="w-3.5 h-3.5 text-sky-400" />
+      ),
+      action: oracleOptions.onToggleOracleMaintained,
     },
   ];
 }
 
-export function buildViewsGroupContextMenuItems(
+export function buildObjectGroupContextMenuItems(
+  spec: ObjectGroupSpec,
   connId: string,
   schemaName: string,
   dialect: DatabaseType,
-  cb: NavigatorMenuCallbacks
+  cb: NavigatorMenuCallbacks,
+  oracleOptions?: {
+    showOracleMaintained: boolean;
+    onToggleOracleMaintained: () => void;
+  }
 ): ContextMenuItem[] {
-  return [
-    {
-      id: 'create_new_view',
-      label: 'Create New View',
-      icon: <Plus className="w-3.5 h-3.5 text-emerald-400" />,
-      action: () => cb.onOpenSqlEditor(connId, generateCreateViewTemplateSql(schemaName, dialect)),
-    },
-  ];
-}
+  const items: ContextMenuItem[] = [];
 
-export function buildProceduresGroupContextMenuItems(
-  connId: string,
-  schemaName: string,
-  dialect: DatabaseType,
-  cb: NavigatorMenuCallbacks
-): ContextMenuItem[] {
-  return [
-    {
-      id: 'create_new_procedure',
-      label: 'Create New Procedure',
-      icon: <Plus className="w-3.5 h-3.5 text-amber-400" />,
-      action: () => cb.onOpenSqlEditor(connId, generateCreateProcedureTemplateSql(schemaName, dialect)),
-    },
-  ];
+  if (spec.supportsCreate) {
+    items.push({
+      id: `create_${spec.kind}`,
+      label: `Create New ${spec.singularLabel}${spec.kind === 'tables' ? '...' : ''}`,
+      icon: <Plus className={`w-3.5 h-3.5 ${spec.colorClass}`} />,
+      action: () =>
+        spec.kind === 'tables'
+          ? cb.onCreateTableClick(connId)
+          : cb.onOpenSqlEditor(
+              connId,
+              generateCreateObjectTemplateSql(spec.kind, schemaName, dialect)
+            ),
+    });
+  }
+
+  if (isNetworkDatabaseType(dialect) && cb.onRefreshConnection) {
+    items.push({
+      id: `refresh_${spec.kind}`,
+      label: `Refresh ${spec.label}`,
+      icon: <RefreshCw className="w-3.5 h-3.5 text-sky-400" />,
+      action: () => cb.onRefreshConnection?.(connId),
+    });
+  }
+
+  if (spec.kind === 'tables' && dialect === 'oracle' && oracleOptions) {
+    items.push(...buildOracleMaintainedToggleItems(oracleOptions, items.length > 0));
+  }
+
+  return items;
 }
 
 export function buildColumnContextMenuItems(
@@ -267,70 +346,53 @@ export function buildSchemaContextMenuItems(
   dbType: DatabaseType = 'sqlite'
 ): ContextMenuItem[] {
   const consoleLabel = getConsoleActionLabel(dbType);
-  if (!supportsErDiagram(dbType)) {
-    return [
-      {
-        id: 'open_sql',
-        label: `Open ${consoleLabel}`,
-        icon: <FileCode className="w-3.5 h-3.5 text-amber-400" />,
-        action: () => cb.onOpenSqlEditor(connId),
-      },
-    ];
-  }
-
-  return [
-    {
-      id: 'create_table',
-      label: `Create New Table in ${schemaName}...`,
-      icon: <Plus className="w-3.5 h-3.5 text-emerald-400" />,
-      action: () => cb.onCreateTableClick(connId),
-    },
+  const items: ContextMenuItem[] = [
     {
       id: 'open_sql',
       label: `Open ${consoleLabel}`,
       icon: <FileCode className="w-3.5 h-3.5 text-amber-400" />,
       action: () => cb.onOpenSqlEditor(connId),
     },
-    {
+  ];
+
+  if (supportsErDiagram(dbType)) {
+    items.push({
       id: 'view_erd',
       label: 'View Schema ER Diagram',
       icon: <LayoutGrid className="w-3.5 h-3.5 text-sky-400" />,
       action: () => cb.onOpenERDiagram(connId),
-    },
-  ];
-}
-
-export function buildTablesGroupContextMenuItems(
-  connId: string,
-  schemaName: string,
-  cb: NavigatorMenuCallbacks,
-  dbType: DatabaseType = 'sqlite',
-  oracleOptions?: {
-    showOracleMaintained: boolean;
-    onToggleOracleMaintained: () => void;
-  }
-): ContextMenuItem[] {
-  const items = buildSchemaContextMenuItems(connId, schemaName, cb, dbType);
-  if (dbType !== 'oracle' || !oracleOptions) {
-    return items;
+    });
   }
 
-  return [
-    ...items,
-    { id: 'div_oracle_sys', isDivider: true, label: '' },
-    {
-      id: 'toggle_oracle_maintained',
-      label: oracleOptions.showOracleMaintained
-        ? 'Hide Oracle-Maintained Tables'
-        : 'Show Oracle-Maintained Tables',
-      icon: oracleOptions.showOracleMaintained ? (
-        <EyeOff className="w-3.5 h-3.5 text-zinc-400" />
-      ) : (
-        <Eye className="w-3.5 h-3.5 text-sky-400" />
-      ),
-      action: oracleOptions.onToggleOracleMaintained,
-    },
-  ];
+  if (isNetworkDatabaseType(dbType) && cb.onRefreshConnection) {
+    items.push({
+      id: 'refresh_schema',
+      label: 'Refresh Schema',
+      icon: <RefreshCw className="w-3.5 h-3.5 text-sky-400" />,
+      action: () => cb.onRefreshConnection?.(connId),
+    });
+  }
+
+  const createSpecs = getObjectGroupsForEngine(dbType).filter((g) => g.supportsCreate);
+  if (createSpecs.length > 0) {
+    items.push({ id: 'div_schema_create', isDivider: true, label: '' });
+    for (const spec of createSpecs) {
+      items.push({
+        id: `schema_create_${spec.kind}`,
+        label: `Create New ${spec.singularLabel}${spec.kind === 'tables' ? '...' : ''}`,
+        icon: <Plus className={`w-3.5 h-3.5 ${spec.colorClass}`} />,
+        action: () =>
+          spec.kind === 'tables'
+            ? cb.onCreateTableClick(connId)
+            : cb.onOpenSqlEditor(
+                connId,
+                generateCreateObjectTemplateSql(spec.kind, schemaName, dbType)
+              ),
+      });
+    }
+  }
+
+  return items;
 }
 
 export function buildConnectionContextMenuItems(
