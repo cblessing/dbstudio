@@ -177,11 +177,6 @@ export function DataGridPaginationFooter({
           {hasMore ? '+' : ''} rows loaded ({executionTimeMs}ms execution, {fetchTimeMs}ms
           fetch)
         </span>
-        {hasMore && (
-          <span className="text-sky-400">
-            • More rows available (page forward to load next 1,000)
-          </span>
-        )}
       </div>
 
       <div className="flex items-center gap-2">
