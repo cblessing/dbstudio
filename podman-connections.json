@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "connections": [
+    {
+      "name": "Local PostgreSQL",
+      "type": "postgres",
+      "host": "127.0.0.1",
+      "port": 5432,
+      "database": "dbstudio",
+      "username": "postgres",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "colorBadge": "#336791"
+    },
+    {
+      "name": "Local MySQL",
+      "type": "mysql",
+      "host": "127.0.0.1",
+      "port": 3306,
+      "database": "dbstudio",
+      "username": "root",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "colorBadge": "#00758F"
+    },
+    {
+      "name": "Local MariaDB",
+      "type": "mariadb",
+      "host": "127.0.0.1",
+      "port": 3307,
+      "database": "dbstudio",
+      "username": "root",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "colorBadge": "#C0715D"
+    },
+    {
+      "name": "Local SQL Server",
+      "type": "sqlserver",
+      "host": "127.0.0.1",
+      "port": 1433,
+      "database": "dbstudio",
+      "username": "sa",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "colorBadge": "#CC292B"
+    },
+    {
+      "name": "Local Oracle",
+      "type": "oracle",
+      "host": "127.0.0.1",
+      "port": 1521,
+      "database": "FREEPDB1",
+      "username": "dbstudio",
+      "ssl": false,
+      "rejectUnauthorized": true,
+      "colorBadge": "#F80000"
+    },
+    {
+      "name": "Local ClickHouse",
+      "type": "clickhouse",
+      "host": "127.0.0.1",
+      "port": 8123,
+      "database": "dbstudio",
+      "username": "default",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "colorBadge": "#FAFF00"
+    },
+    {
+      "name": "Local MongoDB",
+      "type": "mongodb",
+      "host": "127.0.0.1",
+      "port": 27017,
+      "database": "dbstudio",
+      "username": "root",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "colorBadge": "#13AA52"
+    },
+    {
+      "name": "Local Redis",
+      "type": "redis",
+      "host": "127.0.0.1",
+      "port": 6379,
+      "database": "0",
+      "username": "",
+      "ssl": true,
+      "rejectUnauthorized": false,
+      "colorBadge": "#D82C20"
+    }
+  ]
+}

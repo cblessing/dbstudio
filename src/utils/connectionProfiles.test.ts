@@ -7,6 +7,7 @@ import {
   getConsoleActionLabel,
   groupTablesIntoSchemas,
 } from './connectionProfiles';
+import { getConnectionFieldLabels } from './connectionLabels';
 import { DatabaseConnection } from '../types/database';
 
 test('supportsErDiagram and getConsoleActionLabel distinguish SQL vs NoSQL engines', () => {
@@ -88,4 +89,18 @@ test('groupTablesIntoSchemas groups tables by schema, prioritizes default schema
 
   const empty = groupTablesIntoSchemas([], 'public');
   assert.deepEqual(empty, [{ name: 'public', tables: [], views: [], procedures: [] }]);
+});
+
+test('getConnectionFieldLabels returns database-specific nomenclature', () => {
+  const oracle = getConnectionFieldLabels('oracle');
+  assert.equal(oracle.databaseLabel, 'Service Name / SID');
+  assert.equal(oracle.usernameLabel, 'Username (Schema)');
+
+  const mssql = getConnectionFieldLabels('sqlserver');
+  assert.equal(mssql.hostLabel, 'Server');
+  assert.equal(mssql.usernameLabel, 'Login');
+
+  const redis = getConnectionFieldLabels('redis');
+  assert.equal(redis.databaseLabel, 'Database Index');
+  assert.equal(redis.passwordLabel, 'Password / AUTH');
 });

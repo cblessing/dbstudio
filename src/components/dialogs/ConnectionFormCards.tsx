@@ -12,26 +12,17 @@ import {
   Shield,
   SlidersHorizontal,
 } from 'lucide-react';
-import { DatabaseDriverInfo } from '../../types/database';
 import {
   buildConnectionUri,
   parseConnectionUri,
   ParsedConnectionUri,
 } from '../../utils/connectionUri';
+import {
+  ConnectionFormState,
+  getConnectionFieldLabels,
+} from '../../utils/connectionLabels';
 
-export interface ConnectionFormState {
-  selectedDriver: DatabaseDriverInfo;
-  step: 'pick' | 'configure';
-  connectionName: string;
-  host: string;
-  port: number;
-  database: string;
-  username: string;
-  password: string;
-  ssl: boolean;
-  allowSelfSigned: boolean;
-  colorBadge: string;
-}
+export type { ConnectionFormState };
 
 const INPUT_CLASS =
   'w-full bg-[#19191b] border border-[#3a3a3e] focus:border-[#007acc] focus:ring-2 focus:ring-[#007acc]/30 rounded px-2.5 py-1.5 text-[#f1f1f1] placeholder-[#6e6e73] outline-none transition-all text-xs';
@@ -149,11 +140,15 @@ export function GeneralCard({
 function ConnectionUriField({
   form,
   isEditing,
+  label,
+  placeholder,
   onApplyUri,
   onResolveSavedPassword,
 }: {
   form: ConnectionFormState;
   isEditing: boolean;
+  label: string;
+  placeholder: string;
   onApplyUri: (parsed: ParsedConnectionUri) => void;
   onResolveSavedPassword?: () => Promise<string>;
 }) {
@@ -195,7 +190,7 @@ function ConnectionUriField({
   return (
     <div>
       <label htmlFor="conn_uri_input" className="block text-[#a1a1aa] mb-1 font-medium">
-        Connection URI
+        {label}
       </label>
       <div className="relative">
         <input
@@ -211,7 +206,7 @@ function ConnectionUriField({
             setDraftUri(null);
             setUriError(null);
           }}
-          placeholder="postgresql://user:password@127.0.0.1:5432/dbstudio"
+          placeholder={placeholder}
           className={`${INPUT_CLASS} font-mono pr-9`}
         />
         <button
@@ -250,11 +245,13 @@ function resolvePasswordDisplay(
 function PasswordField({
   value,
   isEditing,
+  label,
   onChange,
   onResolveSavedPassword,
 }: {
   value: string;
   isEditing: boolean;
+  label: string;
   onChange: (password: string) => void;
   onResolveSavedPassword?: () => Promise<string>;
 }) {
@@ -280,7 +277,7 @@ function PasswordField({
   return (
     <div>
       <label htmlFor="conn_pwd_input" className="block text-[#a1a1aa] mb-1 font-medium">
-        Password
+        {label}
       </label>
       <div className="relative">
         <input
@@ -324,6 +321,8 @@ export function ServerAuthCard({
   onApplyUri: (parsed: ParsedConnectionUri) => void;
   onResolveSavedPassword?: () => Promise<string>;
 }) {
+  const labels = getConnectionFieldLabels(form.selectedDriver.id);
+
   return (
     <CollapsibleCard
       title="Server & Authentication"
@@ -335,6 +334,8 @@ export function ServerAuthCard({
       <ConnectionUriField
         form={form}
         isEditing={isEditing}
+        label={labels.uriLabel}
+        placeholder={labels.uriPlaceholder}
         onApplyUri={onApplyUri}
         onResolveSavedPassword={onResolveSavedPassword}
       />
@@ -342,20 +343,20 @@ export function ServerAuthCard({
       <div className="grid grid-cols-3 gap-3">
         <div className="col-span-2">
           <label htmlFor="conn_host_input" className="block text-[#a1a1aa] mb-1 font-medium">
-            Host / Server
+            {labels.hostLabel}
           </label>
           <input
             id="conn_host_input"
             type="text"
             value={form.host}
             onChange={(e) => onChange({ host: e.target.value })}
-            placeholder="127.0.0.1"
+            placeholder={labels.hostPlaceholder}
             className={`${INPUT_CLASS} font-mono`}
           />
         </div>
         <div>
           <label htmlFor="conn_port_input" className="block text-[#a1a1aa] mb-1 font-medium">
-            Port
+            {labels.portLabel}
           </label>
           <input
             id="conn_port_input"
@@ -369,14 +370,14 @@ export function ServerAuthCard({
 
       <div>
         <label htmlFor="conn_db_input" className="block text-[#a1a1aa] mb-1 font-medium">
-          Database / Catalog
+          {labels.databaseLabel}
         </label>
         <input
           id="conn_db_input"
           type="text"
           value={form.database}
           onChange={(e) => onChange({ database: e.target.value })}
-          placeholder="dbstudio"
+          placeholder={labels.databasePlaceholder}
           className={`${INPUT_CLASS} font-mono`}
         />
       </div>
@@ -384,13 +385,14 @@ export function ServerAuthCard({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="conn_user_input" className="block text-[#a1a1aa] mb-1 font-medium">
-            Username
+            {labels.usernameLabel}
           </label>
           <input
             id="conn_user_input"
             type="text"
             value={form.username}
             onChange={(e) => onChange({ username: e.target.value })}
+            placeholder={labels.usernamePlaceholder}
             className={`${INPUT_CLASS} font-mono`}
           />
         </div>
@@ -398,6 +400,7 @@ export function ServerAuthCard({
         <PasswordField
           value={form.password}
           isEditing={isEditing}
+          label={labels.passwordLabel}
           onChange={(password) => onChange({ password })}
           onResolveSavedPassword={onResolveSavedPassword}
         />
