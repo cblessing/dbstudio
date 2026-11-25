@@ -2,7 +2,7 @@
   "name": "database-studio-vscode",
   "displayName": "Database Studio",
   "description": "Universal database client for VS Code supporting PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, ClickHouse, MongoDB, Redis, DuckDB, and SQLite with SSH bastion tunneling, visual ER diagrams, live EXPLAIN plans, and paginated data grid.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "cblessing",
   "license": "Apache-2.0",
   "icon": "public/icon.png",

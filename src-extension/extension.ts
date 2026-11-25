@@ -4,8 +4,11 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import { LiveConnectionService, SecretStoreLike } from './drivers/connectionService';
 import { tryHandleLiveRpcMessage } from './drivers/rpcHandler';
+import { isLiveDriverType } from './drivers/types';
 
 export { LiveConnectionService };
+
+const CONNECTIONS_STORAGE_KEY = 'dbstudio.connections';
 
 interface EditorTabConfig {
   editorType: 'query' | 'erd' | 'table';
@@ -19,8 +22,15 @@ class ExtensionStateStore {
   public connections: any[] | undefined = undefined;
   public ddlHistory: string[] = [];
   public queryCounter = 0;
+  private globalState: vscode.Memento | undefined = undefined;
   private webviews = new Set<vscode.Webview>();
   private reusablePanels = new Map<string, vscode.WebviewPanel>();
+
+  public attachStorage(globalState?: vscode.Memento) {
+    this.globalState = globalState;
+    const saved = globalState?.get<any[]>(CONNECTIONS_STORAGE_KEY);
+    this.connections = Array.isArray(saved) ? stripConnectionSecrets(saved) : undefined;
+  }
 
   public registerWebview(webview: vscode.Webview, disposables?: vscode.Disposable[]) {
     this.webviews.add(webview);
@@ -40,6 +50,7 @@ class ExtensionStateStore {
   public broadcastState(sender: vscode.Webview, connections?: any[], ddlQuery?: string) {
     if (connections) {
       this.connections = stripConnectionSecrets(connections);
+      void this.globalState?.update(CONNECTIONS_STORAGE_KEY, this.connections);
     }
     if (ddlQuery) {
       this.ddlHistory.push(ddlQuery);
@@ -85,10 +96,35 @@ function createFallbackSecretStore(): SecretStoreLike {
   };
 }
 
+function restoreLiveConnections(
+  service: LiveConnectionService,
+  connections?: any[]
+): void {
+  if (!connections) return;
+  for (const conn of connections) {
+    if (!conn || !isLiveDriverType(conn.type)) continue;
+    void service
+      .saveConnection({
+        id: conn.id,
+        type: conn.type,
+        host: conn.host,
+        port: conn.port,
+        database: conn.database,
+        username: conn.username,
+        ssl: conn.ssl === true,
+        rejectUnauthorized: conn.rejectUnauthorized !== false,
+        ssh: conn.ssh,
+      })
+      .catch(() => {});
+  }
+}
+
 export function activate(context: vscode.ExtensionContext) {
   liveConnectionService = new LiveConnectionService(
     context.secrets ?? createFallbackSecretStore()
   );
+  stateStore.attachStorage(context.globalState);
+  restoreLiveConnections(liveConnectionService, stateStore.connections);
   const openDisposable = vscode.commands.registerCommand(
     'database-studio.open',
     () => {
@@ -257,6 +293,13 @@ function stripConnectionSecrets(connections: any[]): any[] {
     if (!conn || typeof conn !== 'object') return conn;
     const { password: _omitted, ...safeConn } = conn;
     void _omitted;
+    if (safeConn.ssh && typeof safeConn.ssh === 'object') {
+      const { secret: _s, password: _p, passphrase: _pp, ...safeSsh } = safeConn.ssh;
+      void _s;
+      void _p;
+      void _pp;
+      return { ...safeConn, ssh: safeSsh };
+    }
     return safeConn;
   });
 }

@@ -251,6 +251,144 @@ test('compiled VS Code extension activates and generates valid Webview HTML', as
   }
 });
 
+test('extension persists sanitized connections in globalState and restores them on restart', async () => {
+  const { createRequire } = await import('node:module');
+  const path = await import('node:path');
+  const require = createRequire(import.meta.url);
+  const CjsModule = require('node:module');
+
+  const persistedStore = new Map<string, unknown>();
+  const globalStateMock = {
+    get: (key: string) => persistedStore.get(key),
+    update: async (key: string, value: unknown) => {
+      persistedStore.set(key, value);
+    },
+  };
+
+  let registeredCommandCb: (() => void) | null = null;
+  let messageHandler: ((msg: unknown) => Promise<void>) | null = null;
+  let createdPanelHtml = '';
+
+  const vscodeMock = {
+    ViewColumn: { One: 1 },
+    Uri: {
+      joinPath: (base: { fsPath: string }, ...segments: string[]) => ({
+        fsPath: path.join(base.fsPath, ...segments),
+        toString: () => `file://${path.posix.join(base.fsPath.replace(/\\/g, '/'), ...segments)}`,
+      }),
+      file: (p: string) => ({ fsPath: p }),
+    },
+    commands: {
+      registerCommand: (cmd: string, cb: () => void) => {
+        if (cmd === 'database-studio.open') registeredCommandCb = cb;
+        return { dispose: () => {} };
+      },
+      executeCommand: () => {},
+    },
+    window: {
+      activeTextEditor: undefined,
+      registerWebviewViewProvider: () => ({ dispose: () => {} }),
+      createWebviewPanel: () => {
+        const webview = {
+          _html: '',
+          cspSource: 'https://file+.vscode-resource.vscode-cdn.net',
+          get html() {
+            return this._html;
+          },
+          set html(val: string) {
+            this._html = val;
+            createdPanelHtml = val;
+          },
+          asWebviewUri: (uri: { fsPath: string }) =>
+            `https://file+.vscode-resource.vscode-cdn.net/${uri.fsPath.replace(/\\/g, '/')}`,
+          onDidReceiveMessage: (cb: (msg: unknown) => Promise<void>) => {
+            messageHandler = cb;
+            return { dispose: () => {} };
+          },
+          postMessage: () => {},
+        };
+        return {
+          webview,
+          onDidDispose: () => ({ dispose: () => {} }),
+          reveal: () => {},
+          dispose: () => {},
+        };
+      },
+      showInformationMessage: () => {},
+      showErrorMessage: () => {},
+    },
+    workspace: { workspaceFolders: [] },
+  };
+
+  const origLoad = CjsModule._load;
+  CjsModule._load = function (request: string, parent: any, isMain: boolean) {
+    if (request === 'vscode') return vscodeMock;
+    return origLoad.call(this, request, parent, isMain);
+  };
+
+  try {
+    const extPath = path.resolve(process.cwd(), 'out/extension.js');
+    delete require.cache[extPath];
+    const ext = require(extPath);
+    ext.activate({
+      extensionUri: { fsPath: process.cwd() },
+      subscriptions: [],
+      globalState: globalStateMock,
+    });
+
+    (registeredCommandCb as () => void)();
+    assert.ok(messageHandler, 'webview message handler should be registered');
+    assert.ok(!createdPanelHtml.includes('conn_pg_prod'));
+
+    await (messageHandler as (msg: unknown) => Promise<void>)({
+      command: 'stateUpdate',
+      connections: [
+        {
+          id: 'conn_pg_prod',
+          name: 'Prod Postgres',
+          type: 'postgres',
+          host: 'db.example.com',
+          port: 5432,
+          database: 'appdb',
+          username: 'admin',
+          password: 'super-secret-password',
+          ssh: {
+            enabled: true,
+            host: 'bastion.example.com',
+            port: 22,
+            username: 'ec2-user',
+            authMethod: 'password',
+            password: 'ssh-secret-password',
+          },
+        },
+      ],
+    });
+
+    const saved = persistedStore.get('dbstudio.connections') as Array<Record<string, any>>;
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].id, 'conn_pg_prod');
+    assert.equal(saved[0].password, undefined, 'password must be stripped before persisting');
+    assert.equal(saved[0].ssh.password, undefined, 'SSH secret must be stripped before persisting');
+
+    // Simulate a full VS Code restart by clearing module cache and re-activating with the same globalState
+    createdPanelHtml = '';
+    delete require.cache[extPath];
+    const restartedExt = require(extPath);
+    restartedExt.activate({
+      extensionUri: { fsPath: process.cwd() },
+      subscriptions: [],
+      globalState: globalStateMock,
+    });
+    (registeredCommandCb as () => void)();
+
+    assert.ok(createdPanelHtml.includes('window.__VSCODE_INITIAL_CONNECTIONS__'));
+    assert.ok(createdPanelHtml.includes('conn_pg_prod'));
+    assert.ok(!createdPanelHtml.includes('super-secret-password'));
+  } finally {
+    CjsModule._load = origLoad;
+  }
+});
+
 test('importDatabaseBinary rejects invalid non-SQLite byte buffers', async () => {
   const invalidBytes = new TextEncoder().encode('not a sqlite database file');
   const imported = await databaseManager.importDatabaseBinary(invalidBytes);

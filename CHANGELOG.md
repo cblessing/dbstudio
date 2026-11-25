@@ -2,6 +2,11 @@
 
 All notable changes to **Database Studio** will be documented in this file.
 
+## [1.0.1] - Bug Fix Release
+
+### Fixed
+- **Connection Persistence Across Restarts**: Connection profiles are now persisted in VS Code `globalState` (stripped of passwords and SSH secrets, which remain in `SecretStorage`) and automatically restored along with live driver registrations when reopening VS Code.
+
 ## [1.0.0] - Initial Release
 
 ### Added
