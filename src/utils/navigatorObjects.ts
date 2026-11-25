@@ -4,11 +4,60 @@ import {
   generateCreateProcedureTemplateSql,
 } from './tableManagement';
 
-function quoteDialectIdentifier(name: string, dialect: DatabaseType): string {
+export function quoteDialectIdentifier(name: string, dialect: DatabaseType): string {
   const cleaned = name.replace(/[`"[\];\r\n]/g, '').trim() || 'object';
   if (dialect === 'sqlserver') return `[${cleaned}]`;
   if (dialect === 'postgres' || dialect === 'oracle') return `"${cleaned}"`;
   return `\`${cleaned}\``;
+}
+
+export function generateSelectTableSql(
+  tableName: string,
+  dialect: DatabaseType,
+  limit = 1000,
+  offset = 0
+): string {
+  if (dialect === 'mongodb') {
+    return JSON.stringify({ find: tableName, limit, skip: offset }, null, 2);
+  }
+  if (dialect === 'redis') {
+    return 'KEYS *';
+  }
+  const id = quoteDialectIdentifier(tableName, dialect);
+  if (dialect === 'oracle') {
+    return `SELECT * FROM ${id} OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
+  }
+  if (dialect === 'sqlserver') {
+    return offset > 0
+      ? `SELECT * FROM ${id} ORDER BY (SELECT NULL) OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`
+      : `SELECT TOP ${limit} * FROM ${id}`;
+  }
+  return offset > 0
+    ? `SELECT * FROM ${id} LIMIT ${limit} OFFSET ${offset}`
+    : `SELECT * FROM ${id} LIMIT ${limit}`;
+}
+
+export function generateInsertTemplateSql(
+  tableName: string,
+  columns: { name: string; primaryKey?: boolean }[],
+  dialect: DatabaseType
+): string {
+  const id = quoteDialectIdentifier(tableName, dialect);
+  const nonPk = columns.filter((c) => !c.primaryKey);
+  const targetCols = nonPk.length > 0 ? nonPk : columns;
+  const colList = targetCols.map((c) => quoteDialectIdentifier(c.name, dialect)).join(', ');
+  const placeholders = targetCols.map(() => '?').join(', ');
+  return `INSERT INTO ${id} (${colList})\nVALUES (${placeholders});`;
+}
+
+export function generateGroupByColumnSql(
+  tableName: string,
+  colName: string,
+  dialect: DatabaseType
+): string {
+  const tblId = quoteDialectIdentifier(tableName, dialect);
+  const colId = quoteDialectIdentifier(colName, dialect);
+  return `SELECT ${colId}, COUNT(*) AS count\nFROM ${tblId}\nGROUP BY ${colId}\nORDER BY count DESC;`;
 }
 
 export function removeObjectFromSchema(

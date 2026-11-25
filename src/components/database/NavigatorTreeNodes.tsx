@@ -264,6 +264,7 @@ export function SchemaObjectGroups({
                       <ViewTreeItem
                         key={vw.name}
                         connId={connId}
+                        dialect={dbType}
                         vw={vw}
                         isExpanded={Boolean(expandedViews[viewKey])}
                         onToggleExpand={() => onToggleView(viewKey)}

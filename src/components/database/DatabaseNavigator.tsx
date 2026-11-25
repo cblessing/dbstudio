@@ -137,7 +137,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
     connections.find((c) => c.id === connId)?.type ?? 'sqlite';
 
   const handleTableContextMenu = (e: React.MouseEvent, connId: string, tbl: TableDefinition) =>
-    openContextMenu(e, buildTableContextMenuItems(connId, tbl, menuCallbacks));
+    openContextMenu(e, buildTableContextMenuItems(connId, tbl, menuCallbacks, getConnDialect(connId)));
 
   const handleViewContextMenu = (e: React.MouseEvent, connId: string, vw: ViewDefinition) =>
     openContextMenu(e, buildViewContextMenuItems(connId, vw, menuCallbacks, getConnDialect(connId)));
@@ -174,7 +174,7 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
   };
 
   const handleColumnContextMenu = (e: React.MouseEvent, connId: string, tbl: TableDefinition, col: ColumnDefinition) =>
-    openContextMenu(e, buildColumnContextMenuItems(connId, tbl, col, menuCallbacks));
+    openContextMenu(e, buildColumnContextMenuItems(connId, tbl, col, menuCallbacks, getConnDialect(connId)));
 
   const handleSchemaContextMenu = (e: React.MouseEvent, connId: string, schemaName: string) =>
     openContextMenu(e, buildSchemaContextMenuItems(connId, schemaName, menuCallbacks, getConnDialect(connId)));

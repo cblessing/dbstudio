@@ -13,7 +13,10 @@ import { isNetworkDatabaseType } from '../../utils/liveBridge';
 import {
   ObjectGroupSpec,
   generateCreateObjectTemplateSql,
+  generateGroupByColumnSql,
+  generateInsertTemplateSql,
   generateRoutineRunSql,
+  generateSelectTableSql,
   getObjectGroupsForEngine,
 } from '../../utils/navigatorObjects';
 import {
@@ -53,7 +56,8 @@ export interface NavigatorMenuCallbacks {
 export function buildTableContextMenuItems(
   connId: string,
   tbl: TableDefinition,
-  cb: NavigatorMenuCallbacks
+  cb: NavigatorMenuCallbacks,
+  dialect: DatabaseType = 'sqlite'
 ): ContextMenuItem[] {
   const ddlScript = tbl.ddl ? tbl.ddl : `-- DDL for ${tbl.name}`;
   return [
@@ -74,19 +78,14 @@ export function buildTableContextMenuItems(
       id: 'gen_select',
       label: 'Generate SQL: SELECT *',
       icon: <FileCode className="w-3.5 h-3.5 text-amber-400" />,
-      action: () => cb.onOpenSqlEditor(connId, `SELECT * FROM ${tbl.name} LIMIT 100;`),
+      action: () => cb.onOpenSqlEditor(connId, `${generateSelectTableSql(tbl.name, dialect, 100)};`),
     },
     {
       id: 'gen_insert',
       label: 'Generate SQL: INSERT Template',
       icon: <Plus className="w-3.5 h-3.5 text-amber-400" />,
-      action: () => {
-        const nonPkCols = tbl.columns.filter((c) => !c.primaryKey).map((c) => c.name);
-        cb.onOpenSqlEditor(
-          connId,
-          `INSERT INTO ${tbl.name} (${nonPkCols.join(', ')})\nVALUES (${nonPkCols.map(() => '?').join(', ')});`
-        );
-      },
+      action: () =>
+        cb.onOpenSqlEditor(connId, generateInsertTemplateSql(tbl.name, tbl.columns, dialect)),
     },
     {
       id: 'show_ddl',
@@ -128,7 +127,7 @@ export function buildViewContextMenuItems(
       id: 'query_view',
       label: `SELECT * FROM ${vw.name}`,
       icon: <Eye className="w-3.5 h-3.5 text-emerald-400" />,
-      action: () => cb.onOpenSqlEditor(connId, `SELECT * FROM ${vw.name} LIMIT 100;`),
+      action: () => cb.onOpenSqlEditor(connId, `${generateSelectTableSql(vw.name, dialect, 100)};`),
     },
     {
       id: 'view_ddl',
@@ -297,7 +296,8 @@ export function buildColumnContextMenuItems(
   connId: string,
   tbl: TableDefinition,
   col: ColumnDefinition,
-  cb: NavigatorMenuCallbacks
+  cb: NavigatorMenuCallbacks,
+  dialect: DatabaseType = 'sqlite'
 ): ContextMenuItem[] {
   const dropColItems: ContextMenuItem[] = col.primaryKey
     ? []
@@ -330,10 +330,7 @@ export function buildColumnContextMenuItems(
       label: `Group by ${col.name}`,
       icon: <Search className="w-3.5 h-3.5 text-amber-400" />,
       action: () =>
-        cb.onOpenSqlEditor(
-          connId,
-          `SELECT ${col.name}, COUNT(*) AS count\nFROM ${tbl.name}\nGROUP BY ${col.name}\nORDER BY count DESC;`
-        ),
+        cb.onOpenSqlEditor(connId, generateGroupByColumnSql(tbl.name, col.name, dialect)),
     },
     ...dropColItems,
   ];

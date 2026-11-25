@@ -226,6 +226,14 @@ export const TableDetailsView: React.FC<TableDetailsViewProps> = ({
     if (!gridData) {
       return <div className="p-8 text-center text-[#858585]">Failed to load table data.</div>;
     }
+    if (gridData.error) {
+      return (
+        <div className="p-4 m-4 rounded border border-rose-800/50 bg-rose-950/30 text-rose-200 font-mono text-xs space-y-1">
+          <p className="font-semibold text-rose-300">Failed to load rows from {table.name}:</p>
+          <pre className="whitespace-pre-wrap break-words">{gridData.error}</pre>
+        </div>
+      );
+    }
     return (
       <DataGrid
         columns={gridData.columns}

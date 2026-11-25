@@ -15,7 +15,8 @@ import { SqlEditor } from './components/editor/SqlEditor';
 import { TableDetailsView } from './components/views/TableDetailsView';
 import { ERDiagramViewer } from './components/diagram/ERDiagramViewer';
 import { generateDropTableSql, generateTruncateTableSql, generateDropColumnSql } from './utils/tableManagement';
-import { downloadFile, formatSqlValue, postVsCodeMessage, quoteSqlIdentifier } from './utils/exportData';
+import { downloadFile, formatSqlValue, postVsCodeMessage } from './utils/exportData';
+import { generateSelectTableSql, quoteDialectIdentifier } from './utils/navigatorObjects';
 import { executeLiveQuery, isNetworkDatabaseType } from './utils/liveBridge';
 import { useConnectionActions } from './hooks/useConnectionActions';
 import {
@@ -37,6 +38,7 @@ let nextTabId = 2;
 const createTabId = (prefix: string) => `${prefix}_${nextTabId++}`;
 const withFallbackExplain = (res: QueryResult, query: string, explain?: boolean): QueryResult =>
   explain && !res.error && !res.explainPlan?.length ? { ...res, explainPlan: generateExecutionPlan(query) } : res;
+const resolveDialect = (a: DatabaseConnection | null, b: DatabaseConnection | null) => (a ?? b)?.type ?? 'sqlite';
 
 export default function App() {
   const viewMode = getInjectedGlobal<VsCodeViewMode>('__VSCODE_VIEW_MODE__') || 'standalone';
@@ -99,6 +101,8 @@ export default function App() {
   };
 
   const activeConnection = findConnectionOrFallback(connections, activeConnectionId, connections[0] ?? null);
+  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+  const tabConnection = findConnectionOrFallback(connections, activeTab.connectionId, activeConnection);
   const isVsCodeSplitView = viewMode !== 'standalone';
 
   const openSqlEditorTab = (connectionId: string, initialQuery?: string) => {
@@ -193,40 +197,37 @@ export default function App() {
     }
   };
 
-  const handleFetchTableData = async (tableName: string, offset = 0): Promise<QueryResult> =>
-    activeConnection && isNetworkDatabaseType(activeConnection.type)
-      ? executeLiveQuery(activeConnection.id, `SELECT * FROM ${quoteSqlIdentifier(tableName)} LIMIT 1000 OFFSET ${offset}`)
-      : databaseManager.getTableData(tableName, 1000, offset);
-
-  const getActiveTableName = () => {
-    const active = tabs.find((t) => t.id === activeTabId);
-    return active?.tableName ? active.tableName : 'customers';
+  const handleFetchTableData = async (tableName: string, offset = 0): Promise<QueryResult> => {
+    const conn = tabConnection ?? activeConnection;
+    if (conn && isNetworkDatabaseType(conn.type)) {
+      return executeLiveQuery(conn.id, generateSelectTableSql(tableName, conn.type, 1000, offset));
+    }
+    return databaseManager.getTableData(tableName, 1000, offset);
   };
 
+  const getActiveTableName = () => (activeTab.tableName ? activeTab.tableName : 'customers');
+  const activeDialect = resolveDialect(tabConnection, activeConnection);
+
   const handleUpdateRow = async (rowIndex: number, colName: string, newValue: any) => {
-    const tableId = quoteSqlIdentifier(getActiveTableName());
-    const colId = quoteSqlIdentifier(colName);
-    const safeOffset = Math.max(0, Math.floor(rowIndex));
-    const sql = `UPDATE ${tableId} SET ${colId} = ${formatSqlValue(newValue)} WHERE id = (SELECT id FROM ${tableId} LIMIT 1 OFFSET ${safeOffset});`;
-    await handleExecuteQuery(sql);
+    const tbl = quoteDialectIdentifier(getActiveTableName(), activeDialect);
+    const col = quoteDialectIdentifier(colName, activeDialect);
+    const off = Math.max(0, Math.floor(rowIndex));
+    await handleExecuteQuery(`UPDATE ${tbl} SET ${col} = ${formatSqlValue(newValue)} WHERE id = (SELECT id FROM ${tbl} LIMIT 1 OFFSET ${off});`);
   };
 
   const handleAddRow = async (newRow: Record<string, any>) => {
-    const tableId = quoteSqlIdentifier(getActiveTableName());
-    const columns = Object.keys(newRow).filter((k) => newRow[k] !== '');
-    if (columns.length === 0) return;
-
-    const colList = columns.map((k) => quoteSqlIdentifier(k)).join(', ');
-    const values = columns.map((k) => formatSqlValue(newRow[k]));
-    const sql = `INSERT INTO ${tableId} (${colList}) VALUES (${values.join(', ')});`;
-    await handleExecuteQuery(sql);
+    const tbl = quoteDialectIdentifier(getActiveTableName(), activeDialect);
+    const cols = Object.keys(newRow).filter((k) => newRow[k] !== '');
+    if (cols.length === 0) return;
+    const colList = cols.map((k) => quoteDialectIdentifier(k, activeDialect)).join(', ');
+    const vals = cols.map((k) => formatSqlValue(newRow[k])).join(', ');
+    await handleExecuteQuery(`INSERT INTO ${tbl} (${colList}) VALUES (${vals});`);
   };
 
   const handleDeleteRow = async (rowIndex: number) => {
-    const tableId = quoteSqlIdentifier(getActiveTableName());
-    const safeOffset = Math.max(0, Math.floor(rowIndex));
-    const sql = `DELETE FROM ${tableId} WHERE id = (SELECT id FROM ${tableId} LIMIT 1 OFFSET ${safeOffset});`;
-    await handleExecuteQuery(sql);
+    const tbl = quoteDialectIdentifier(getActiveTableName(), activeDialect);
+    const off = Math.max(0, Math.floor(rowIndex));
+    await handleExecuteQuery(`DELETE FROM ${tbl} WHERE id = (SELECT id FROM ${tbl} LIMIT 1 OFFSET ${off});`);
   };
 
   const handleDownloadDatabase = () => {
@@ -342,8 +343,6 @@ export default function App() {
     onExportDatabase: handleDownloadDatabase,
   });
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
-  const tabConnection = findConnectionOrFallback(connections, activeTab.connectionId, activeConnection);
   const currentTableDef = resolveCurrentTableDefinition(tabConnection, activeTab.tableName);
   const editingDialect = editingColumnsTable ? getConnectionDialect(editingColumnsTable.connectionId) : 'sqlite';
 

@@ -6,7 +6,7 @@ import {
   ProcedureDefinition,
   ColumnDefinition,
 } from '../../types/database';
-import { generateRoutineRunSql } from '../../utils/navigatorObjects';
+import { generateRoutineRunSql, generateSelectTableSql } from '../../utils/navigatorObjects';
 import {
   ChevronRight,
   ChevronDown,
@@ -139,6 +139,7 @@ export function TableTreeItem({
 
 export function ViewTreeItem({
   connId,
+  dialect,
   vw,
   isExpanded,
   onToggleExpand,
@@ -146,6 +147,7 @@ export function ViewTreeItem({
   onViewContextMenu,
 }: {
   connId: string;
+  dialect: DatabaseType;
   vw: ViewDefinition;
   isExpanded: boolean;
   onToggleExpand: () => void;
@@ -154,7 +156,7 @@ export function ViewTreeItem({
 }) {
   const columns = vw.columns ?? [];
   const hasCols = columns.length > 0;
-  const querySql = `SELECT * FROM ${vw.name} LIMIT 100;`;
+  const querySql = `${generateSelectTableSql(vw.name, dialect, 100)};`;
 
   return (
     <div className="mt-0.5">

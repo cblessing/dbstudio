@@ -6,6 +6,9 @@ import {
   generateCreatePackageTemplateSql,
   generateDropObjectSql,
   generateRoutineRunSql,
+  generateSelectTableSql,
+  generateInsertTemplateSql,
+  generateGroupByColumnSql,
   removeObjectFromSchema,
 } from './navigatorObjects';
 
@@ -49,6 +52,25 @@ test('generateDropObjectSql and generateRoutineRunSql respect dialect syntax', (
   assert.equal(generateRoutineRunSql('function', 'calc_tax', 'oracle'), 'SELECT "calc_tax"() FROM DUAL;');
   assert.equal(generateRoutineRunSql('procedure', 'sync_orders', 'postgres'), 'CALL "sync_orders"();');
   assert.equal(generateRoutineRunSql('procedure', 'sp_sync', 'sqlserver'), 'EXEC [sp_sync];');
+});
+
+test('generateSelectTableSql, generateInsertTemplateSql, and generateGroupByColumnSql use dialect syntax', () => {
+  assert.equal(generateSelectTableSql('customers', 'postgres', 100, 0), 'SELECT * FROM "customers" LIMIT 100');
+  assert.equal(
+    generateSelectTableSql('CUSTOMERS', 'oracle', 1000, 0),
+    'SELECT * FROM "CUSTOMERS" OFFSET 0 ROWS FETCH NEXT 1000 ROWS ONLY'
+  );
+  assert.equal(generateSelectTableSql('customers', 'sqlserver', 1000, 0), 'SELECT TOP 1000 * FROM [customers]');
+  assert.equal(
+    generateSelectTableSql('customers', 'sqlserver', 1000, 1000),
+    'SELECT * FROM [customers] ORDER BY (SELECT NULL) OFFSET 1000 ROWS FETCH NEXT 1000 ROWS ONLY'
+  );
+  assert.match(generateSelectTableSql('customers', 'mongodb', 50, 0), /"find": "customers"/);
+  assert.equal(
+    generateInsertTemplateSql('customers', [{ name: 'id', primaryKey: true }, { name: 'email' }], 'postgres'),
+    'INSERT INTO "customers" ("email")\nVALUES (?);'
+  );
+  assert.match(generateGroupByColumnSql('customers', 'city', 'sqlserver'), /FROM \[customers\]/);
 });
 
 test('removeObjectFromSchema removes only the targeted object kind and name', () => {
