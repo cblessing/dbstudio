@@ -1,1 +1,201 @@
 @import "tailwindcss";
+
+:root {
+  --db-bg-editor: var(--vscode-editor-background, #1e1e1e);
+  --db-bg-sidebar: var(--vscode-sideBar-background, #252526);
+  --db-bg-panel: var(--vscode-panel-background, var(--vscode-sideBar-background, #252526));
+  --db-bg-elevated: var(--vscode-editorWidget-background, var(--vscode-sideBarSectionHeader-background, #2d2d2d));
+  --db-bg-input: var(--vscode-input-background, #1e1e1e);
+  --db-bg-hover: var(--vscode-list-hoverBackground, #2a2d2e);
+  --db-bg-active: var(--vscode-list-activeSelectionBackground, #37373d);
+  --db-bg-btn: var(--vscode-button-secondaryBackground, #333333);
+  --db-bg-btn-hover: var(--vscode-button-secondaryHoverBackground, #3c3c3c);
+  --db-bg-accent: var(--vscode-button-background, #007acc);
+  --db-bg-accent-hover: var(--vscode-button-hoverBackground, #0066ad);
+  --db-fg: var(--vscode-foreground, #cccccc);
+  --db-fg-strong: var(--vscode-editor-foreground, #ffffff);
+  --db-fg-muted: var(--vscode-descriptionForeground, #858585);
+  --db-fg-input: var(--vscode-input-foreground, #cccccc);
+  --db-fg-active: var(--vscode-list-activeSelectionForeground, #ffffff);
+  --db-fg-accent: var(--vscode-textLink-foreground, #007acc);
+  --db-fg-button: var(--vscode-button-foreground, #ffffff);
+  --db-fg-btn-secondary: var(--vscode-button-secondaryForeground, #cccccc);
+  --db-border: var(--vscode-panel-border, var(--vscode-widget-border, #2d2d2d));
+  --db-border-strong: var(--vscode-input-border, var(--vscode-contrastBorder, #3c3c3c));
+  --db-focus: var(--vscode-focusBorder, #007acc);
+}
+
+html,
+body {
+  background-color: var(--db-bg-editor);
+  color: var(--db-fg);
+}
+
+/* Adapt all hardcoded dark surfaces, borders, and text to the active VS Code theme
+   (Dark, Light, High Contrast, High Contrast Light, and third-party themes). */
+body[class*="vscode-"] .bg-\[\#1e1e1e\],
+body[class*="vscode-"] .bg-\[\#181818\],
+body[class*="vscode-"] .bg-\[\#111111\] {
+  background-color: var(--db-bg-editor);
+}
+
+body[class*="vscode-"] .bg-\[\#19191b\] {
+  background-color: var(--db-bg-input);
+}
+
+body[class*="vscode-"] .bg-\[\#252526\],
+body[class*="vscode-"] .bg-\[\#232325\] {
+  background-color: var(--db-bg-sidebar);
+}
+
+body[class*="vscode-"] .bg-\[\#2d2d2d\],
+body[class*="vscode-"] .bg-\[\#26262a\] {
+  background-color: var(--db-bg-elevated);
+}
+
+body[class*="vscode-"] .bg-\[\#333333\],
+body[class*="vscode-"] .bg-\[\#313136\],
+body[class*="vscode-"] .bg-\[\#2b2b2f\] {
+  background-color: var(--db-bg-btn);
+  color: var(--db-fg-btn-secondary);
+}
+
+body[class*="vscode-"] .bg-\[\#37373d\],
+body[class*="vscode-"] .bg-\[\#04395e\] {
+  background-color: var(--db-bg-active);
+  color: var(--db-fg-active);
+}
+
+body[class*="vscode-"] .bg-\[\#007acc\] {
+  background-color: var(--db-bg-accent);
+  color: var(--db-fg-button);
+}
+
+body[class*="vscode-"] .hover\:bg-\[\#2a2d2e\]:hover,
+body[class*="vscode-"] .hover\:bg-\[\#252526\]:hover,
+body[class*="vscode-"] .hover\:bg-\[\#282828\]:hover {
+  background-color: var(--db-bg-hover);
+}
+
+body[class*="vscode-"] .hover\:bg-\[\#3c3c3c\]:hover,
+body[class*="vscode-"] .hover\:bg-\[\#333333\]:hover,
+body[class*="vscode-"] .hover\:bg-\[\#454545\]:hover,
+body[class*="vscode-"] .hover\:bg-\[\#3c3c42\]:hover,
+body[class*="vscode-"] .hover\:bg-\[\#36363c\]:hover {
+  background-color: var(--db-bg-btn-hover);
+}
+
+body[class*="vscode-"] .hover\:bg-\[\#0066ad\]:hover,
+body[class*="vscode-"] .hover\:bg-\[\#0062a3\]:hover,
+body[class*="vscode-"] .hover\:bg-\[\#005a9e\]:hover,
+body[class*="vscode-"] .hover\:bg-\[\#007acc\]:hover {
+  background-color: var(--db-bg-accent-hover);
+}
+
+body[class*="vscode-"] .text-\[\#cccccc\],
+body[class*="vscode-"] .text-\[\#e6e6e6\],
+body[class*="vscode-"] .text-\[\#f1f1f1\],
+body[class*="vscode-"] .text-\[\#d4d4d8\],
+body[class*="vscode-"] .text-\[\#e4e4e7\] {
+  color: var(--db-fg);
+}
+
+body[class*="vscode-"] .text-\[\#9cdcfe\] {
+  color: var(--db-fg-strong);
+}
+
+body[class*="vscode-"] .text-\[\#858585\],
+body[class*="vscode-"] .text-\[\#8e8e93\],
+body[class*="vscode-"] .text-\[\#969696\],
+body[class*="vscode-"] .text-\[\#a0a0a0\],
+body[class*="vscode-"] .text-\[\#a1a1aa\],
+body[class*="vscode-"] .text-\[\#999999\],
+body[class*="vscode-"] .text-\[\#b0b0b0\],
+body[class*="vscode-"] .text-\[\#6b6b6b\],
+body[class*="vscode-"] .text-\[\#666666\] {
+  color: var(--db-fg-muted);
+}
+
+body[class*="vscode-"] .text-\[\#007acc\] {
+  color: var(--db-fg-accent);
+}
+
+body[class*="vscode-"] .border-\[\#2d2d2d\],
+body[class*="vscode-"] .border-\[\#1e1e1e\],
+body[class*="vscode-"] .border-\[\#333333\] {
+  border-color: var(--db-border);
+}
+
+body[class*="vscode-"] .border-\[\#3c3c3c\],
+body[class*="vscode-"] .border-\[\#3a3a3e\],
+body[class*="vscode-"] .border-\[\#454545\] {
+  border-color: var(--db-border-strong);
+}
+
+body[class*="vscode-"] .border-\[\#007acc\],
+body[class*="vscode-"] .focus\:border-\[\#007acc\]:focus {
+  border-color: var(--db-focus);
+}
+
+/* Light and High-Contrast-Light adjustments for white-tinted utilities */
+body.vscode-light .text-white:not(.bg-\[\#007acc\]):not(.bg-\[\#238636\]):not([class*="bg-rose-"]):not([class*="bg-emerald-"]):not([class*="bg-amber-"]):not([style*="background-color"]),
+body.vscode-high-contrast-light .text-white:not(.bg-\[\#007acc\]):not(.bg-\[\#238636\]):not([class*="bg-rose-"]):not([class*="bg-emerald-"]):not([class*="bg-amber-"]):not([style*="background-color"]) {
+  color: var(--db-fg-strong);
+}
+
+body.vscode-light .hover\:text-white:hover,
+body.vscode-high-contrast-light .hover\:text-white:hover {
+  color: var(--db-fg-strong);
+}
+
+body.vscode-light .border-white\/10,
+body.vscode-light .border-white\/5,
+body.vscode-light .divide-white\/10 > :not(:first-child),
+body.vscode-high-contrast-light .border-white\/10,
+body.vscode-high-contrast-light .border-white\/5,
+body.vscode-high-contrast-light .divide-white\/10 > :not(:first-child) {
+  border-color: var(--db-border);
+}
+
+body.vscode-light .hover\:bg-white\/\[0\.04\]:hover,
+body.vscode-light .hover\:bg-white\/10:hover,
+body.vscode-light .hover\:bg-white\/5:hover,
+body.vscode-high-contrast-light .hover\:bg-white\/\[0\.04\]:hover,
+body.vscode-high-contrast-light .hover\:bg-white\/10:hover,
+body.vscode-high-contrast-light .hover\:bg-white\/5:hover {
+  background-color: var(--db-bg-hover);
+}
+
+body.vscode-light .text-sky-300,
+body.vscode-light .text-sky-400,
+body.vscode-high-contrast-light .text-sky-300,
+body.vscode-high-contrast-light .text-sky-400 {
+  color: var(--vscode-textLink-foreground, #0066bf);
+}
+
+body.vscode-light .text-amber-200,
+body.vscode-light .text-amber-300,
+body.vscode-high-contrast-light .text-amber-200,
+body.vscode-high-contrast-light .text-amber-300 {
+  color: #9a5b00;
+}
+
+body.vscode-light .text-emerald-400,
+body.vscode-high-contrast-light .text-emerald-400 {
+  color: #0e7a48;
+}
+
+body.vscode-light .text-rose-200,
+body.vscode-light .text-rose-300,
+body.vscode-light .text-rose-400,
+body.vscode-high-contrast-light .text-rose-200,
+body.vscode-high-contrast-light .text-rose-300,
+body.vscode-high-contrast-light .text-rose-400 {
+  color: var(--vscode-errorForeground, #c72e2e);
+}
+
+/* High contrast border visibility */
+body.vscode-high-contrast *,
+body.vscode-high-contrast-light * {
+  outline-color: var(--vscode-focusBorder);
+}
