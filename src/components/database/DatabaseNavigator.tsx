@@ -347,12 +347,6 @@ export const DatabaseNavigator: React.FC<DatabaseNavigatorProps> = ({
         )}
       </div>
 
-      <div className="px-2.5 py-1.5 border-t border-[#333333] bg-[#1e1e1e] flex items-center justify-between text-[11px] text-[#858585]">
-        <button onClick={onOpenNewConnectionModal} className="text-sky-400 hover:underline font-medium">
-          + Connect
-        </button>
-      </div>
-
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}

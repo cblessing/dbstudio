@@ -84,18 +84,6 @@
         {
           "command": "database-studio.openErd"
         }
-      ],
-      "view/title": [
-        {
-          "command": "database-studio.newQuery",
-          "when": "view == database-studio.sidebarView",
-          "group": "navigation@1"
-        },
-        {
-          "command": "database-studio.openErd",
-          "when": "view == database-studio.sidebarView",
-          "group": "navigation@2"
-        }
       ]
     }
   },

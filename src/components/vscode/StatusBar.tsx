@@ -10,14 +10,12 @@ interface StatusBarProps {
     isExecuting?: boolean;
   };
   onOpenNewConnection: () => void;
-  onOpenCommandPalette: () => void;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
   activeConnection,
   executionStats,
   onOpenNewConnection,
-  onOpenCommandPalette,
 }) => {
   return (
     <footer
@@ -70,18 +68,6 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             </span>
           </div>
         ) : null}
-      </div>
-
-      {/* Right side */}
-      <div className="flex items-center gap-3 text-[11px]">
-        <button
-          onClick={onOpenCommandPalette}
-          className="hover:bg-[#005a9e] px-1.5 py-0.5 rounded transition-colors opacity-90 hover:opacity-100"
-          title="Press Ctrl+P or F1 for quick command palette"
-        >
-          UTF-8
-        </button>
-        <span className="opacity-75">SQL</span>
       </div>
     </footer>
   );

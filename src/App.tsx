@@ -490,7 +490,6 @@ export default function App() {
         activeConnection={activeConnection}
         executionStats={executionStats}
         onOpenNewConnection={() => setConnectionModal({ open: true, editing: null })}
-        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
       {renderModals()}
     </div>

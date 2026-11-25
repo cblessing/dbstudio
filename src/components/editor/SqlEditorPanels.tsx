@@ -4,7 +4,6 @@ import {
   Square,
   Wand2,
   GitCommit,
-  Clock,
   Database,
   AlertCircle,
   CheckCircle2,
@@ -154,7 +153,6 @@ export function SqlEditorToolbar({
         >
           <Play className="w-3.5 h-3.5 fill-current" />
           <span>{runLabel}</span>
-          <span className="text-[10px] opacity-75 ml-1 font-mono">⌘↵</span>
         </button>
 
         <button
@@ -314,19 +312,6 @@ function ResultsTabHeader({
           <span>Messages</span>
         </button>
       </div>
-
-      {hasSuccessResult && (
-        <div className="text-[11px] text-[#858585] flex items-center gap-2 pr-2">
-          <Clock className="w-3 h-3 text-sky-400" />
-          <span>
-            Execution: <span className="text-white font-mono">{result!.executionTimeMs}ms</span>
-          </span>
-          <span>•</span>
-          <span>
-            Fetch: <span className="text-white font-mono">{result!.fetchTimeMs}ms</span>
-          </span>
-        </div>
-      )}
     </div>
   );
 }
