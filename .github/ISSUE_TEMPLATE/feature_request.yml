@@ -1,0 +1,27 @@
+name: Feature Story
+description: Propose a new feature or enhancement for Database Studio
+labels: ["feature-story", "enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User Story / Problem Statement
+      description: What problem does this solve or what workflow should it enable?
+      placeholder: "As a developer using Database Studio, I want to..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution & Acceptance Criteria
+      description: Outline the expected behavior and key tasks.
+      placeholder: |
+        - [ ] Task 1
+        - [ ] Task 2
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security / Performance Considerations
+      description: Optional notes on credential handling, pagination, or remote/WSL support.
