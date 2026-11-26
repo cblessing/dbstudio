@@ -14,7 +14,7 @@ Follow these engineering practices on every change in this repository.
 - **Clean Domain Naming:** Do not leak internal runtime or demo jargon (such as `"wasm"` or `"WebAssembly"`) into UI copy, identifiers, file names, or comments.
 
 ## 3. Shift-Left Testing & Verification
-- **Test Alongside Code:** Add or update unit tests (following the test pyramid: fast unit tests for utilities, engine logic, and dialect translation) whenever adding features or fixing bugs.
+- **Feature-Scoped Automated & Regression Tests:** For every new feature or bug fix, add automated tests matching the code touched (fast unit tests for utilities, engine logic, and dialect translation, plus targeted integration/regression tests for extension host handlers, IPC/RPC messages, file I/O, and stateful UI flows).
 - **Definition of Done:** Before completing any code change, run and verify:
   1. `npm run lint` (TypeScript type check)
   2. `npm run build` (frontend bundle + VS Code extension host compilation)
